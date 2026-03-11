@@ -93,10 +93,13 @@ impl Decoder {
     }
     
     pub fn vn_update(&mut self) {
+	let mut incoming = Vec::with_capacity(self.vn_max_deg);
 	for (vn, edges) in self.vn_edges.iter().enumerate() {
 
-	    let incoming: Vec<f32> =
-		edges.iter().map(|&e| self.msg_cn_to_vn[e]).collect();
+	    incoming.clear();
+	    for &e in edges {
+		incoming.push(self.msg_cn_to_vn[e]);
+	    }
 
 	    let mut result = normalized_mult_exc_one(&incoming);
 
@@ -116,9 +119,12 @@ impl Decoder {
     }
 
     pub fn cn_update(&mut self) {
+	let mut incoming = Vec::with_capacity(self.cn_max_deg);
 	for edges in self.cn_edges.iter() {
-	    let incoming: Vec<f32> =
-		edges.iter().map(|&e| self.msg_vn_to_cn[e]).collect();
+	    incoming.clear();
+	    for &e in edges {
+		incoming.push(self.msg_vn_to_cn[e]);
+	    }
 
 	    let result = gallager_prod_exc_one(&incoming);
 
