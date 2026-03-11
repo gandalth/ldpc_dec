@@ -28,6 +28,5 @@ pub fn build_graph(h_csr: &CsMat<u8>)
             edge_id += 1;
         }
     }
-
     (cn_edges, vn_edges, edge_to_vn)
 }

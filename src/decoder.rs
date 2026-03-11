@@ -21,7 +21,7 @@ pub struct Decoder {
 }
 
 impl Decoder {
-  // Constructor
+    // Constructor
     pub fn new(h: CsMat<u8>, info_positions: Vec<i32>) -> Self {
 
 	let (k, n)  = h.shape();
@@ -33,8 +33,6 @@ impl Decoder {
 	// Build the graph and the edges for decoding
 	let (cn_edges, vn_edges, edge_to_vn) = build_graph(&h);
 
-	//println!("cn edges {:?}, vn edges {:?}", cn_edges, vn_edges);
-	
 	let msg_vn_to_cn = vec![0.0; n_edges];
 	let msg_cn_to_vn = vec![0.5; n_edges]; // Init 0.5 for first half-iter
 
@@ -147,9 +145,6 @@ impl Decoder {
             for e in edges {
 		let vn = self.edge_to_vn[*e];
 		parity ^= vn_quantized[vn];
-		//println!("edges {:?}", edges);
-		//println!("edge to vn {:?}", self.edge_to_vn);
-		//println!("vn_quantized len: {}, vn: {}", vn_quantized.len(), vn);
             }
 
             if parity != 0 {
@@ -175,8 +170,6 @@ impl Decoder {
 	} else {
 	    println!("Using systematic encoding, information positions: {:?}",
 		     self.info_pos);
+	}
     }
-
-    }
-    
 }

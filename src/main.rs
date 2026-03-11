@@ -37,14 +37,8 @@ fn main() {
 	Ok(_) => (),
 	Err(e) => println!("error: {}", e),
     }
-
-
 }
 
-
-
-// recv: encoded, bpsk-mapped, AWGN-noise : 2 * mod(x*G, 2) - 1 + noise
-// sigma: std-dev of AWGN noise
 
 
 

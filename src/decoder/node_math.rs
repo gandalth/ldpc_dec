@@ -1,4 +1,3 @@
-
 pub fn normalized_mult_exc_one(f0: &[f32]) -> Vec<f32> {
 
     let n = f0.len();
@@ -35,7 +34,7 @@ pub fn normalized_mult_exc_one(f0: &[f32]) -> Vec<f32> {
 }
 
 pub fn gallager_prod_exc_one(f0: &[f32]) -> Vec<f32> {
-    // Calculate Gallager product over input slice with leaving out exactly one
+    // Calculate Gallager product over input slice leaving out exactly one
     // input element in each variation (to receive extrinsic information)
 
     let n = f0.len();
@@ -52,14 +51,10 @@ pub fn gallager_prod_exc_one(f0: &[f32]) -> Vec<f32> {
     for i in 1..n {
         prefix[i] = prefix[i - 1] * x[i - 1];
     }
-
-    //println!("Prefix: {:?}", prefix);
     
     for i in (0..n - 1).rev() {
         suffix[i] = suffix[i + 1] * x[i + 1];
     }
-
-    //println!("Suffix: {:?}", (0..n));
     
     (0..n)
         .map(|i| 0.5 * (prefix[i] * suffix[i]) + 0.5)
@@ -89,8 +84,6 @@ pub fn normalized_mult(f0: &[f32]) -> f32 {
 pub fn hard_decision(p0: &[f32]) -> Vec<u8> {
     p0.iter().map(|&p| (p < 0.5) as u8).collect()
 }
-
-
 
 fn _gallager_prod(f0: &[f32]) -> f32 {
     let p0: f32 = f0
