@@ -17,6 +17,8 @@ pub struct Decoder {
     pub msg_cn_to_vn: Vec<f32>,
     pub cn_edges:     Vec<Vec<usize>>,
     pub vn_edges:     Vec<Vec<usize>>,
+    pub cn_max_deg:   usize,
+    pub vn_max_deg:   usize,
     pub edge_to_vn:   Vec<usize>,
 }
 
@@ -32,7 +34,9 @@ impl Decoder {
 	
 	// Build the graph and the edges for decoding
 	let (cn_edges, vn_edges, edge_to_vn) = build_graph(&h);
-
+	let cn_max_deg = cn_edges.iter().map(|c| c.len()).max().unwrap();
+	let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
+	
 	let msg_vn_to_cn = vec![0.0; n_edges];
 	let msg_cn_to_vn = vec![0.5; n_edges]; // Init 0.5 for first half-iter
 
@@ -49,6 +53,8 @@ impl Decoder {
 	    msg_cn_to_vn,
 	    cn_edges,
 	    vn_edges,
+	    cn_max_deg,
+	    vn_max_deg,
 	    edge_to_vn
 	}
     }
@@ -163,8 +169,8 @@ impl Decoder {
 	    syst_enc = false;
 	}
     
-	println!("Decoder properties:\nn: {}, k: {}, max iterations: {}.",
-		 self.n, self.k, self.iter);
+	println!("Decoder properties:\nn: {}, k: {}, max iterations: {}, max dc: {}, max dv: {}",
+		 self.n, self.k, self.iter, self.cn_max_deg, self.vn_max_deg);
 	if !syst_enc {
 	    println!("Using non-systematic encoding.");
 	} else {
