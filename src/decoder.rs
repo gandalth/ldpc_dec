@@ -13,8 +13,8 @@ pub struct Decoder {
     pub info_pos:     Vec<i32>,
     pub iter:         u32,
     pub p0_aprio:     Vec<f32>,
-    pub msg_vn_to_cn: Vec<f32>,
     pub msg_cn_to_vn: Vec<f32>,
+    pub msg_vn_to_cn: Vec<f32>,
     pub cn_edges:     Vec<Vec<usize>>,
     pub vn_edges:     Vec<Vec<usize>>,
     pub cn_max_deg:   usize,
@@ -37,8 +37,8 @@ impl Decoder {
 	let cn_max_deg = cn_edges.iter().map(|c| c.len()).max().unwrap();
 	let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
 	
-	let msg_vn_to_cn = vec![0.0; n_edges];
 	let msg_cn_to_vn = vec![0.5; n_edges]; // Init 0.5 for first half-iter
+	let msg_vn_to_cn = vec![0.0; n_edges];
 
 	// Set default for iter, the maximum number of iterations
 	let iter = 100;
@@ -49,8 +49,8 @@ impl Decoder {
 	    info_pos,
 	    iter,
 	    p0_aprio,
-	    msg_vn_to_cn,
 	    msg_cn_to_vn,
+	    msg_vn_to_cn,
 	    cn_edges,
 	    vn_edges,
 	    cn_max_deg,
