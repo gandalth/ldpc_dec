@@ -136,12 +136,13 @@ impl Decoder {
 
     pub fn vn_aposteriori(&self) -> Vec<f32> {
 	let mut result = Vec::with_capacity(self.vn_edges.len());
+	let mut incoming = Vec::with_capacity(self.vn_max_deg);
 	
 	for (vn, edges) in self.vn_edges.iter().enumerate() {
-
-	    let mut incoming: Vec<f32> =
-		edges.iter().map(|&e| self.msg_cn_to_vn[e]).collect();
-
+	    incoming.clear();
+	    for &e in edges {
+		incoming.push(self.msg_cn_to_vn[e]);
+	    }
 	    // Add apriori information to find aposteriori info per vn
 	    incoming.push(self.p0_aprio[vn]);
 	    
