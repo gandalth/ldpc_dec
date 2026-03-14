@@ -68,10 +68,11 @@ impl Decoder {
 	}
 
 	// Calculate a-priori probabilites based on channel output
-	let sigma2 = sigma * sigma;
-	self.p0_aprio = recv.iter()
-	    .map(|&r| 1.0 / (1.0 + (2.0 * r / sigma2).exp()))
-	    .collect();
+	let alpha = 2.0 / (sigma * sigma);
+
+	for i in 0..self.n {
+	    self.p0_aprio[i] = 1.0 / (1.0 + (alpha * recv[i]).exp())
+	}
 	
         let mut i = 0u32;
 	while i < self.iter {
