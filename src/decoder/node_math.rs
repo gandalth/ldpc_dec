@@ -42,22 +42,24 @@ pub fn gallager_prod_exc_one(f0: &[f32]) -> Vec<f32> {
 	return Vec::new();
     }
     
-    let x: Vec<f32> = f0.iter().map(|&f| 2.0 * f - 1.0).collect();
-
     let mut prefix = vec![1.0; n];
     let mut suffix = vec![1.0; n];
+    let mut result = vec![0.0; n];
 
     for i in 1..n {
-        prefix[i] = prefix[i - 1] * x[i - 1];
+	let x_prev = 2.0 * f0[i - 1] - 1.0;
+	prefix[i]  = prefix[i - 1] * x_prev;
     }
-    
+
     for i in (0..n - 1).rev() {
-        suffix[i] = suffix[i + 1] * x[i + 1];
+	let x_next = 2.0 * f0[i + 1] - 1.0;
+        suffix[i]  = suffix[i + 1] * x_next;
     }
-    
-    (0..n)
-        .map(|i| 0.5 * (prefix[i] * suffix[i]) + 0.5)
-        .collect()
+
+    for i in 0..n {
+	result[i] = 0.5 * (prefix[i] * suffix[i]) + 0.5;
+    }
+    result
 }
 
 pub fn normalized_mult(f0: &[f32]) -> f32 {
