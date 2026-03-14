@@ -47,7 +47,6 @@ pub fn gallager_prod_exc_one(f0: &[f32]) -> Vec<f32> {
     let mut prefix = vec![1.0; n];
     let mut suffix = vec![1.0; n];
 
-    //println!("x: {:?}", x);
     for i in 1..n {
         prefix[i] = prefix[i - 1] * x[i - 1];
     }

@@ -176,7 +176,8 @@ impl Decoder {
 	    syst_enc = false;
 	}
     
-	println!("Decoder properties:\nn: {}, k: {}, max iterations: {}, max dc: {}, max dv: {}",
+	println!("Decoder properties:\nn: {}, \
+		  k: {}, max iterations: {}, max dc: {}, max dv: {}",
 		 self.n, self.k, self.iter, self.cn_max_deg, self.vn_max_deg);
 	if !syst_enc {
 	    println!("Using non-systematic encoding.");
