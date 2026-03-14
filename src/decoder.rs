@@ -78,7 +78,6 @@ impl Decoder {
 	    scratch_result
 	}
     }
-
     
     pub fn decode(&mut self, recv: &[f32], sigma: f32 ) -> Result<(), String> {
 	if recv.len() != self.n {
