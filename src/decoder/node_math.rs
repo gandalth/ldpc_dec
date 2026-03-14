@@ -1,15 +1,14 @@
-pub fn normalized_mult_exc_one(f0: &[f32]) -> Vec<f32> {
+pub fn normalized_mult_exc_one(f0: &[f32],
+			       prefix_f0: &mut [f32], suffix_f0: &mut [f32],
+			       prefix_f1: &mut [f32], suffix_f1: &mut [f32],
+			       result: &mut [f32]) {
 
     let n = f0.len();
-    if n == 0 {
-	return Vec::new();
-    }
 
-    let mut prefix_f0 = vec![1.0; n];
-    let mut suffix_f0 = vec![1.0; n];
-    let mut prefix_f1 = vec![1.0; n];
-    let mut suffix_f1 = vec![1.0; n];
-    let mut result    = vec![0.0; n];
+    prefix_f0.fill(1.0);
+    suffix_f0.fill(1.0);
+    prefix_f1.fill(1.0);
+    suffix_f1.fill(1.0);
 
     for i in 1..n {
         prefix_f0[i] = prefix_f0[i - 1] * f0[i - 1];
@@ -30,21 +29,18 @@ pub fn normalized_mult_exc_one(f0: &[f32]) -> Vec<f32> {
 		result[i] = num / den
 	}
     }
-    result
 }
 
-pub fn gallager_prod_exc_one(f0: &[f32]) -> Vec<f32> {
+pub fn gallager_prod_exc_one(f0: &[f32],
+			     prefix_f0: &mut [f32], suffix_f0: &mut [f32],
+			     result: &mut [f32]) {
     // Calculate Gallager product over input slice leaving out exactly one
     // input element in each variation (to receive extrinsic information)
 
     let n = f0.len();
-    if n == 0 {
-	return Vec::new();
-    }
-    
-    let mut prefix_f0 = vec![1.0; n];
-    let mut suffix_f0 = vec![1.0; n];
-    let mut result = vec![0.0; n];
+
+    prefix_f0.fill(1.0);
+    suffix_f0.fill(1.0);
 
     for i in 1..n {
 	let x_prev = 2.0 * f0[i - 1] - 1.0;
@@ -59,7 +55,6 @@ pub fn gallager_prod_exc_one(f0: &[f32]) -> Vec<f32> {
     for i in 0..n {
 	result[i] = 0.5 * (prefix_f0[i] * suffix_f0[i]) + 0.5;
     }
-    result
 }
 
 pub fn normalized_mult(f0: &[f32]) -> f32 {

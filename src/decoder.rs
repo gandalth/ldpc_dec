@@ -1,4 +1,5 @@
 use sprs::CsMat;
+use std::cmp::max;
 
 mod graph;
 use graph::build_graph;
@@ -8,18 +9,24 @@ use node_math::{gallager_prod_exc_one, normalized_mult_exc_one,
 		normalized_mult, hard_decision};
 
 pub struct Decoder {
-    pub n:            usize,
-    pub k:            usize,
-    pub info_pos:     Vec<i32>,
-    pub iter:         u32,
-    pub p0_aprio:     Vec<f32>,
-    pub msg_cn_to_vn: Vec<f32>,
-    pub msg_vn_to_cn: Vec<f32>,
-    pub cn_edges:     Vec<Vec<usize>>,
-    pub vn_edges:     Vec<Vec<usize>>,
-    pub cn_max_deg:   usize,
-    pub vn_max_deg:   usize,
-    pub edge_to_vn:   Vec<usize>,
+    pub n:                    usize,
+    pub k:                    usize,
+    pub info_pos:             Vec<i32>,
+    pub iter:                 u32,
+    pub p0_aprio:             Vec<f32>,
+    pub msg_cn_to_vn:         Vec<f32>,
+    pub msg_vn_to_cn:         Vec<f32>,
+    pub cn_edges:             Vec<Vec<usize>>,
+    pub vn_edges:             Vec<Vec<usize>>,
+    pub cn_max_deg:           usize,
+    pub vn_max_deg:           usize,
+    pub edge_to_vn:           Vec<usize>,
+    // Scratch variables for efficient memory handling
+    pub scratch_prefix_f0:    Vec<f32>,
+    pub scratch_prefix_f1:    Vec<f32>,
+    pub scratch_suffix_f0:    Vec<f32>,
+    pub scratch_suffix_f1:    Vec<f32>,
+    pub scratch_result:       Vec<f32>
 }
 
 impl Decoder {
@@ -42,6 +49,14 @@ impl Decoder {
 
 	// Set default for iter, the maximum number of iterations
 	let iter = 100;
+
+	// Allocate prefix/suffix vectors and result vector
+	let max_deg = max(cn_max_deg, vn_max_deg);
+	let scratch_prefix_f0 = vec![1.0; max_deg];
+	let scratch_prefix_f1 = vec![1.0; max_deg];
+	let scratch_suffix_f0 = vec![1.0; max_deg];
+	let scratch_suffix_f1 = vec![1.0; max_deg];
+	let scratch_result    = vec![0.0; max_deg];
 	
 	Self {
 	    n,
@@ -55,7 +70,12 @@ impl Decoder {
 	    vn_edges,
 	    cn_max_deg,
 	    vn_max_deg,
-	    edge_to_vn
+	    edge_to_vn,
+	    scratch_prefix_f0,
+	    scratch_prefix_f1,
+	    scratch_suffix_f0,
+	    scratch_suffix_f1,
+	    scratch_result
 	}
     }
 
@@ -95,6 +115,7 @@ impl Decoder {
     
     pub fn vn_update(&mut self) {
 	let mut incoming = Vec::with_capacity(self.vn_max_deg);
+
 	for (vn, edges) in self.vn_edges.iter().enumerate() {
 
 	    incoming.clear();
@@ -102,8 +123,15 @@ impl Decoder {
 		incoming.push(self.msg_cn_to_vn[e]);
 	    }
 
-	    let mut result = normalized_mult_exc_one(&incoming);
+	    let deg = incoming.len();
+	    let prefix_f0 = &mut self.scratch_prefix_f0[..deg];
+	    let suffix_f0 = &mut self.scratch_suffix_f0[..deg];
+	    let prefix_f1 = &mut self.scratch_prefix_f1[..deg];
+	    let suffix_f1 = &mut self.scratch_suffix_f1[..deg];
+	    let result    = &mut self.scratch_result[..deg];
 
+	    normalized_mult_exc_one(&incoming, prefix_f0, suffix_f0,
+				    prefix_f1, suffix_f1, result);
 	    // Multiply a-prio info from channel ONCE per outgoing edge
 	    let mut pair = [0.0f32; 2];
 	    pair[1] = self.p0_aprio[vn];
@@ -126,8 +154,11 @@ impl Decoder {
 	    for &e in edges {
 		incoming.push(self.msg_vn_to_cn[e]);
 	    }
-
-	    let result = gallager_prod_exc_one(&incoming);
+	    let deg = incoming.len();
+	    let prefix_f0 = &mut self.scratch_prefix_f0[..deg];
+	    let suffix_f0 = &mut self.scratch_suffix_f0[..deg];
+	    let result    = &mut self.scratch_result[..deg];
+	    gallager_prod_exc_one(&incoming, prefix_f0, suffix_f0, result);
 
 	    for (&e, &val) in edges.iter().zip(result.iter()) {
 		self.msg_cn_to_vn[e] = val;
