@@ -92,7 +92,9 @@ impl Decoder {
 	for i in 0..self.n {
 	    self.p0_aprio[i] = 1.0 / (1.0 + (alpha * recv[i]).exp())
 	}
-	
+	self.msg_cn_to_vn.fill(0.5); // Init 0.5 for first half-iter
+	self.msg_vn_to_cn.fill(0.0);
+
         let mut i = 0u32;
 	while i < self.iter {
 	    self.vn_update(); // Start with vn_update to get channel info
