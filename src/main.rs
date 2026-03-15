@@ -22,20 +22,22 @@ fn main() {
     // Create sample received vector (AWGN output)
     let mut rng = rng();
     let sigma = 0.8;
+    let runs = 100;
 
-    // recv: encoded, bpsk-mapped, AWGN-noise : 2 * mod(x*G, 2) - 1 + noise
-    // sigma: std-dev of AWGN noise
-    // For quick check, use all-zeros codeword
-    let mut recv = vec![-1.0; n];
-    for ri in &mut recv {
-	let noise: f32 = StandardNormal.sample(&mut rng);
-	*ri += sigma * noise;
-    }
+    for _ in 0..runs {
+	// recv: encoded, bpsk-mapped, AWGN-noise : 2 * mod(x*G, 2) - 1 + noise
+	// sigma: std-dev of AWGN noise
+	// For quick check, use all-zeros codeword
+	let mut recv = vec![-1.0; n];
+	for re in &mut recv {
+	    let noise: f32 = StandardNormal.sample(&mut rng);
+	    *re += sigma * noise;
+	}
 
-
-    match dec.decode(&recv, sigma) {
-	Ok(_) => (),
-	Err(e) => println!("error: {}", e),
+	match dec.decode(&recv, sigma) {
+	    Ok(_) => (),
+	    Err(e) => println!("error: {}", e),
+	}
     }
 }
 
