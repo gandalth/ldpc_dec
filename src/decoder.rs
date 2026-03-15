@@ -9,91 +9,74 @@ use node_math::{gallager_prod_exc_one, normalized_mult_exc_one,
 		normalized_mult, hard_decision};
 
 pub struct Decoder {
-    pub n:                    usize,
-    pub k:                    usize,
     pub info_pos:             Vec<i32>,
     pub iter:                 u32,
-    pub p0_aprio:             Vec<f32>,
-    pub msg_cn_to_vn:         Vec<f32>,
-    pub msg_vn_to_cn:         Vec<f32>,
-    pub cn_edges:             Vec<Vec<usize>>,
-    pub vn_edges:             Vec<Vec<usize>>,
-    pub cn_max_deg:           usize,
-    pub vn_max_deg:           usize,
-    pub edge_to_vn:           Vec<usize>,
-    // Scratch variables for efficient memory handling
-    pub scratch_prefix_f0:    Vec<f32>,
-    pub scratch_prefix_f1:    Vec<f32>,
-    pub scratch_suffix_f0:    Vec<f32>,
-    pub scratch_suffix_f1:    Vec<f32>,
-    pub scratch_result:       Vec<f32>
+    pub graph:                DecoderGraph,
+    pub state:                DecoderState,
+    pub scratch:              DecoderScratch,
+}
+
+pub struct DecoderGraph {
+    pub n:          usize,
+    pub k:          usize,
+    pub n_edges:    usize,
+    pub cn_edges:   Vec<Vec<usize>>,
+    pub vn_edges:   Vec<Vec<usize>>,
+    pub cn_max_deg: usize,
+    pub vn_max_deg: usize,
+    pub edge_to_vn: Vec<usize>
+}
+
+pub struct DecoderState {
+    pub p0_aprio:     Vec<f32>,
+    pub msg_cn_to_vn: Vec<f32>,
+    pub msg_vn_to_cn: Vec<f32>
+}
+
+pub struct DecoderScratch {
+    pub prefix_f0: Vec<f32>,
+    pub prefix_f1: Vec<f32>,
+    pub suffix_f0: Vec<f32>,
+    pub suffix_f1: Vec<f32>,
+    pub result:    Vec<f32>
 }
 
 impl Decoder {
     // Constructor
     pub fn new(h: CsMat<u8>, info_positions: Vec<i32>) -> Self {
 
-	let (k, n)  = h.shape();
-	let n_edges = h.nnz();
-
-	let p0_aprio = vec![0.0; n];
 	let info_pos = info_positions;
-	
-	// Build the graph and the edges for decoding
-	let (cn_edges, vn_edges, edge_to_vn) = build_graph(&h);
-	let cn_max_deg = cn_edges.iter().map(|c| c.len()).max().unwrap();
-	let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
-	
-	let msg_cn_to_vn = vec![0.5; n_edges]; // Init 0.5 for first half-iter
-	let msg_vn_to_cn = vec![0.0; n_edges];
-
 	// Set default for iter, the maximum number of iterations
 	let iter = 100;
 
-	// Allocate prefix/suffix vectors and result vector
-	let max_deg = max(cn_max_deg, vn_max_deg);
-	let scratch_prefix_f0 = vec![1.0; max_deg];
-	let scratch_prefix_f1 = vec![1.0; max_deg];
-	let scratch_suffix_f0 = vec![1.0; max_deg];
-	let scratch_suffix_f1 = vec![1.0; max_deg];
-	let scratch_result    = vec![0.0; max_deg];
+	let graph   = DecoderGraph::new(h);
+	let state   = DecoderState::new(&graph);
+	let scratch = DecoderScratch::new(&graph);
 	
 	Self {
-	    n,
-	    k,
 	    info_pos,
 	    iter,
-	    p0_aprio,
-	    msg_cn_to_vn,
-	    msg_vn_to_cn,
-	    cn_edges,
-	    vn_edges,
-	    cn_max_deg,
-	    vn_max_deg,
-	    edge_to_vn,
-	    scratch_prefix_f0,
-	    scratch_prefix_f1,
-	    scratch_suffix_f0,
-	    scratch_suffix_f1,
-	    scratch_result
+	    graph,
+	    state,
+	    scratch
 	}
     }
     
     pub fn decode(&mut self, recv: &[f32], sigma: f32 ) -> Result<(), String> {
-	if recv.len() != self.n {
+	if recv.len() != self.graph.n {
             return Err(format!(
 		"decode(): recv length {} does not match code length {}",
-		recv.len(), self.n));
+		recv.len(), self.graph.n));
 	}
 
 	// Calculate a-priori probabilites based on channel output
 	let alpha = 2.0 / (sigma * sigma);
 
-	for i in 0..self.n {
-	    self.p0_aprio[i] = 1.0 / (1.0 + (alpha * recv[i]).exp())
+	for i in 0..self.graph.n {
+	    self.state.p0_aprio[i] = 1.0 / (1.0 + (alpha * recv[i]).exp())
 	}
-	self.msg_cn_to_vn.fill(0.5); // Init 0.5 for first half-iter
-	self.msg_vn_to_cn.fill(0.0);
+	self.state.msg_cn_to_vn.fill(0.5); // Init 0.5 for first half-iter
+	self.state.msg_vn_to_cn.fill(0.0);
 
         let mut i = 0u32;
 	while i < self.iter {
@@ -115,27 +98,27 @@ impl Decoder {
     }
     
     pub fn vn_update(&mut self) {
-	let mut incoming = Vec::with_capacity(self.vn_max_deg);
+	let mut incoming = Vec::with_capacity(self.graph.vn_max_deg);
 
-	for (vn, edges) in self.vn_edges.iter().enumerate() {
+	for (vn, edges) in self.graph.vn_edges.iter().enumerate() {
 
 	    incoming.clear();
 	    for &e in edges {
-		incoming.push(self.msg_cn_to_vn[e]);
+		incoming.push(self.state.msg_cn_to_vn[e]);
 	    }
 
 	    let deg = incoming.len();
-	    let prefix_f0 = &mut self.scratch_prefix_f0[..deg];
-	    let suffix_f0 = &mut self.scratch_suffix_f0[..deg];
-	    let prefix_f1 = &mut self.scratch_prefix_f1[..deg];
-	    let suffix_f1 = &mut self.scratch_suffix_f1[..deg];
-	    let result    = &mut self.scratch_result[..deg];
+	    let prefix_f0 = &mut self.scratch.prefix_f0[..deg];
+	    let suffix_f0 = &mut self.scratch.suffix_f0[..deg];
+	    let prefix_f1 = &mut self.scratch.prefix_f1[..deg];
+	    let suffix_f1 = &mut self.scratch.suffix_f1[..deg];
+	    let result    = &mut self.scratch.result[..deg];
 
 	    normalized_mult_exc_one(&incoming, prefix_f0, suffix_f0,
 				    prefix_f1, suffix_f1, result);
 	    // Multiply a-prio info from channel ONCE per outgoing edge
 	    let mut pair = [0.0f32; 2];
-	    pair[1] = self.p0_aprio[vn];
+	    pair[1] = self.state.p0_aprio[vn];
 	
 	    for val in result.iter_mut() {
 		pair[0] = *val;
@@ -143,41 +126,41 @@ impl Decoder {
 	    }
 
 	    for (&e, &val) in edges.iter().zip(result.iter()) {
-		self.msg_vn_to_cn[e] = val;
+		self.state.msg_vn_to_cn[e] = val;
 	    }
 	}
     }
 
     pub fn cn_update(&mut self) {
-	let mut incoming = Vec::with_capacity(self.cn_max_deg);
-	for edges in self.cn_edges.iter() {
+	let mut incoming = Vec::with_capacity(self.graph.cn_max_deg);
+	for edges in self.graph.cn_edges.iter() {
 	    incoming.clear();
 	    for &e in edges {
-		incoming.push(self.msg_vn_to_cn[e]);
+		incoming.push(self.state.msg_vn_to_cn[e]);
 	    }
 	    let deg = incoming.len();
-	    let prefix_f0 = &mut self.scratch_prefix_f0[..deg];
-	    let suffix_f0 = &mut self.scratch_suffix_f0[..deg];
-	    let result    = &mut self.scratch_result[..deg];
+	    let prefix_f0 = &mut self.scratch.prefix_f0[..deg];
+	    let suffix_f0 = &mut self.scratch.suffix_f0[..deg];
+	    let result    = &mut self.scratch.result[..deg];
 	    gallager_prod_exc_one(&incoming, prefix_f0, suffix_f0, result);
 
 	    for (&e, &val) in edges.iter().zip(result.iter()) {
-		self.msg_cn_to_vn[e] = val;
+		self.state.msg_cn_to_vn[e] = val;
 	    }
 	}
     }
 
     pub fn vn_aposteriori(&self) -> Vec<f32> {
-	let mut result = Vec::with_capacity(self.vn_edges.len());
-	let mut incoming = Vec::with_capacity(self.vn_max_deg);
+	let mut result = Vec::with_capacity(self.graph.vn_edges.len());
+	let mut incoming = Vec::with_capacity(self.graph.vn_max_deg);
 	
-	for (vn, edges) in self.vn_edges.iter().enumerate() {
+	for (vn, edges) in self.graph.vn_edges.iter().enumerate() {
 	    incoming.clear();
 	    for &e in edges {
-		incoming.push(self.msg_cn_to_vn[e]);
+		incoming.push(self.state.msg_cn_to_vn[e]);
 	    }
 	    // Add apriori information to find aposteriori info per vn
-	    incoming.push(self.p0_aprio[vn]);
+	    incoming.push(self.state.p0_aprio[vn]);
 	    
 	    result.push(normalized_mult(&incoming));
 	}
@@ -185,11 +168,11 @@ impl Decoder {
     }
     
     pub fn valid_cw(&self, vn_quantized: &[u8]) -> bool {
-	for edges in &self.cn_edges {
+	for edges in &self.graph.cn_edges {
             let mut parity = 0u8;
 
             for e in edges {
-		let vn = self.edge_to_vn[*e];
+		let vn = self.graph.edge_to_vn[*e];
 		parity ^= vn_quantized[vn];
             }
 
@@ -211,12 +194,75 @@ impl Decoder {
     
 	println!("Decoder properties:\nn: {}, \
 		  k: {}, max iterations: {}, max dc: {}, max dv: {}",
-		 self.n, self.k, self.iter, self.cn_max_deg, self.vn_max_deg);
+		 self.graph.n, self.graph.k, self.iter,
+		 self.graph.cn_max_deg, self.graph.vn_max_deg);
 	if !syst_enc {
 	    println!("Using non-systematic encoding.");
 	} else {
 	    println!("Using systematic encoding, information positions: {:?}",
 		     self.info_pos);
+	}
+    }
+}
+
+impl DecoderGraph {
+    // Constructor
+    pub fn new(h: CsMat<u8>) -> Self {
+
+	let (k, n)  = h.shape();
+	let n_edges = h.nnz();
+
+	// Build the graph and the edges for decoding
+	let (cn_edges, vn_edges, edge_to_vn) = build_graph(&h);
+	let cn_max_deg = cn_edges.iter().map(|c| c.len()).max().unwrap();
+	let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
+
+	Self {
+	    n,
+	    k,
+	    n_edges,
+	    cn_edges,
+	    vn_edges,
+	    cn_max_deg,
+	    vn_max_deg,
+	    edge_to_vn
+	}
+    }
+}
+
+impl DecoderState {
+    // Constructor
+    pub fn new(graph: &DecoderGraph) -> Self {
+	let p0_aprio = vec![0.0; graph.n];
+	let msg_cn_to_vn = vec![0.5; graph.n_edges]; // 0.5: first half-iter
+	let msg_vn_to_cn = vec![0.0; graph.n_edges];
+
+	Self {
+	    p0_aprio,
+	    msg_cn_to_vn,
+	    msg_vn_to_cn,
+	}
+    }
+}
+
+
+impl DecoderScratch {
+    // Constructor
+    pub fn new(graph: &DecoderGraph) -> Self {
+	// Allocate prefix/suffix vectors and result vector
+	let max_deg = max(graph.vn_max_deg, graph.cn_max_deg);
+	let prefix_f0 = vec![1.0; max_deg];
+	let prefix_f1 = vec![1.0; max_deg];
+	let suffix_f0 = vec![1.0; max_deg];
+	let suffix_f1 = vec![1.0; max_deg];
+	let result    = vec![0.0; max_deg];
+
+	Self {
+	    prefix_f0,
+	    prefix_f1,
+	    suffix_f0,
+	    suffix_f1,
+	    result
 	}
     }
 }
