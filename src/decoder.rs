@@ -255,7 +255,8 @@ impl DecoderState {
 impl DecoderScratch {
     // Constructor
     pub fn new(graph: &DecoderGraph) -> Self {
-	// Allocate prefix/suffix vectors and result vector
+	// Scratch buffers are used by kernel in node_math.rs file.
+	// Resetting and filling is up to these kernels.
 	let max_deg = max(graph.vn_max_deg, graph.cn_max_deg);
 	let prefix_f0 = vec![1.0; max_deg];
 	let prefix_f1 = vec![1.0; max_deg];
