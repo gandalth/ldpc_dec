@@ -18,7 +18,7 @@ pub struct Decoder {
 
 pub struct DecoderGraph {
     pub n:          usize,
-    pub k:          usize,
+    pub m:          usize,
     pub n_edges:    usize,
     pub cn_edges:   Vec<Vec<usize>>,
     pub vn_edges:   Vec<Vec<usize>>,
@@ -194,7 +194,7 @@ impl Decoder {
     
 	println!("Decoder properties:\nn: {}, \
 		  k: {}, max iterations: {}, max dc: {}, max dv: {}",
-		 self.graph.n, self.graph.k, self.iter,
+		 self.graph.n, self.graph.n - self.graph.m, self.iter,
 		 self.graph.cn_max_deg, self.graph.vn_max_deg);
 	if !syst_enc {
 	    println!("Using non-systematic encoding.");
@@ -209,7 +209,7 @@ impl DecoderGraph {
     // Constructor
     pub fn new(h: CsMat<u8>) -> Self {
 
-	let (k, n)  = h.shape();
+	let (m, n)  = h.shape();
 	let n_edges = h.nnz();
 
 	// Build the graph and the edges for decoding
@@ -219,7 +219,7 @@ impl DecoderGraph {
 
 	Self {
 	    n,
-	    k,
+	    m,
 	    n_edges,
 	    cn_edges,
 	    vn_edges,
