@@ -9,11 +9,11 @@ use node_math::{gallager_prod_exc_one, normalized_mult_exc_one,
 		normalized_mult, hard_decision};
 
 pub struct Decoder {
-    pub info_pos:             Vec<i32>,
-    pub iter:                 u32,
-    pub graph:                DecoderGraph,
-    pub state:                DecoderState,
-    pub scratch:              DecoderScratch,
+    pub info_pos: Vec<i32>,
+    pub iter:     u32,
+    pub graph:    DecoderGraph,
+    pub state:    DecoderState,
+    pub scratch:  DecoderScratch,
 }
 
 pub struct DecoderGraph {
