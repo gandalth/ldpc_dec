@@ -72,13 +72,12 @@ impl Decoder {
 	// Calculate a-priori probabilites based on channel output
 	let alpha = 2.0 / (sigma * sigma);
 
+	self.state.reset_msg();
 	for i in 0..self.graph.n {
 	    self.state.p0_aprio[i] = 1.0 / (1.0 + (alpha * recv[i]).exp())
 	}
-	self.state.msg_cn_to_vn.fill(0.5); // Init 0.5 for first half-iter
-	self.state.msg_vn_to_cn.fill(0.0);
 
-        let mut i = 0u32;
+	let mut i = 0u32;
 	while i < self.iter {
 	    self.vn_update(); // Start with vn_update to get channel info
 	    self.cn_update();
@@ -242,6 +241,13 @@ impl DecoderState {
 	    msg_cn_to_vn,
 	    msg_vn_to_cn,
 	}
+    }
+
+    pub fn reset_msg(&mut self) {
+	self.msg_cn_to_vn.fill(0.5); // Init 0.5 for first half-iter
+	self.msg_vn_to_cn.fill(0.0);
+	// Note: filling of msg_vn_to_cn could be skipped for performance,
+	// as iteration order is "vn_update first". Left in for clarity. 
     }
 }
 
