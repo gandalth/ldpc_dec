@@ -1,3 +1,5 @@
+use std::fmt;
+
 use sprs::CsMat;
 use std::cmp::max;
 
@@ -18,6 +20,7 @@ pub struct Decoder {
     pub graph:    DecoderGraph,
     pub state:    DecoderState,
     pub scratch:  DecoderScratch,
+    pub result:   DecoderResult,
 }
 
 pub struct DecoderGraph {
@@ -47,6 +50,12 @@ pub struct DecoderScratch {
     pub result:    Vec<f32>
 }
 
+pub struct DecoderResult {
+    pub estimate: Vec<u8>,
+    pub iterations: u32,
+    pub success: bool
+}
+
 impl Decoder {
     // Constructor
     pub fn new(h: CsMat<u8>, opmode: OpMode, info_positions: Vec<i32>) -> Self {
@@ -59,6 +68,7 @@ impl Decoder {
 	let graph   = DecoderGraph::new(h);
 	let state   = DecoderState::new(&graph);
 	let scratch = DecoderScratch::new(&graph);
+	let result  = DecoderResult::new(&graph);
 	
 	Self {
 	    info_pos,
@@ -66,7 +76,8 @@ impl Decoder {
 	    iter,
 	    graph,
 	    state,
-	    scratch
+	    scratch,
+	    result
 	}
     }
 
@@ -133,17 +144,20 @@ impl Decoder {
 		let vn_quant = hard_decision(&vn_apost);
 		if self.satisfies_syndrome(&vn_quant,
 					   &self.state.hard_syndrome) {
-		    let msg = match self.mode {
-			OpMode::Classic => "Valid codeword found",
-			OpMode::Quantum
-			    => "Error pattern consistent with \
-				most likely syndrome found",
-		    };
-		    println!("{}, {} iterations used.", msg, i);
-		    break;
+		    self.result.estimate   = vn_quant;
+		    self.result.iterations = i;
+		    self.result.success    = true;
+		    return;
 		}
 	    }
 	}
+	// --- recompute final estimate ---
+	let vn_apost = self.vn_aposteriori();
+	let vn_quant = hard_decision(&vn_apost);
+
+	self.result.estimate   = vn_quant;
+	self.result.iterations = self.iter;
+	self.result.success    = false;
     }
     
     pub fn vn_update(&mut self) {
@@ -330,5 +344,40 @@ impl DecoderScratch {
 	    suffix_f1,
 	    result
 	}
+    }
+}
+
+impl DecoderResult {
+    // Constructor
+    pub fn new(graph: &DecoderGraph) -> Self {
+	// Result of the decoding process
+	let estimate   = vec![0; graph.n];
+	let iterations = 0;
+	let success    = false;
+
+	Self {
+	    estimate,
+	    iterations,
+	    success
+	}
+    }
+}
+
+impl fmt::Display for DecoderResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.success { "SUCCESS" } else { "FAILURE" };
+
+        write!(f, "{}, Iterations: {}", status, self.iterations)?;
+
+        // Only print estimate if alternate flag is set
+        if f.alternate() {
+            write!(f, "Estimate: ")?;
+            for bit in &self.estimate {
+                write!(f, "{}", bit)?;
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
     }
 }

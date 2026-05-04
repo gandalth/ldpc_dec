@@ -41,7 +41,8 @@ fn main() {
 	    Ok(_) => (),
 	    Err(e) => println!("error: {}", e),
 	}
-	dec.decode()
+	dec.decode();
+	println!("{}", dec.result);
     }
 }
 
