@@ -37,10 +37,11 @@ fn main() {
 	    *re += sigma * noise;
 	}
 
-	match dec.decode(&recv, sigma) {
+	match dec.load(&recv, sigma) {
 	    Ok(_) => (),
 	    Err(e) => println!("error: {}", e),
 	}
+	dec.decode()
     }
 }
 

@@ -34,6 +34,7 @@ pub struct DecoderGraph {
 pub struct DecoderState {
     pub p0_aprio:      Vec<f32>,
     pub soft_syndrome: Vec<f32>,
+    pub hard_syndrome: Vec<u8>,
     pub msg_cn_to_vn:  Vec<f32>,
     pub msg_vn_to_cn:  Vec<f32>
 }
@@ -68,21 +69,21 @@ impl Decoder {
 	    scratch
 	}
     }
-    
-    pub fn decode(&mut self, data: &[f32], noise: f32 ) -> Result<(), String> {
 
-	// Note: we use the variable data to feed measurements to decoder.
-	// Classical LDPC: channel output, data length n
-	// Quantum LDPC:   soft syndrome, P(check even), data length m
-	let expected_data_len;
-	match self.mode {
-	    OpMode::Classic => expected_data_len = self.graph.n,
-	    OpMode::Quantum => expected_data_len = self.graph.m,
-	}
-	if data.len() != expected_data_len {
+    pub fn load(&mut self, measurement: &[f32], noise: f32 )
+		-> Result<(), String> {
+
+	// Load measurements into the decoder.
+	// Classical LDPC: channel output of length n
+	// Quantum LDPC:   soft syndrome P(parity even) of length m
+	let expected_meas_len = match self.mode {
+	    OpMode::Classic => self.graph.n,
+	    OpMode::Quantum => self.graph.m,
+	};
+	if measurement.len() != expected_meas_len {
             return Err(format!(
-		"decode(): data length {} does not match expected length {}",
-		data.len(), expected_data_len));
+		"load(): measurement length {} while {} expected",
+		measurement.len(), expected_meas_len));
 	}
 
 	self.state.reset_msg();
@@ -95,14 +96,14 @@ impl Decoder {
 		let alpha = 2.0 / (sigma * sigma);
 		for i in 0..self.graph.n {
 		    self.state.p0_aprio[i] = 1.0 /
-			(1.0 + (alpha * data[i]).exp())
+			(1.0 + (alpha * measurement[i]).exp())
 		}
 		for i in 0..self.graph.m {
 		    self.state.soft_syndrome[i] = 1.0 // All checks even
 		}
 	    }
 	    OpMode::Quantum => {
-		// Variable data holds soft syndrome, i.e. P(parity_i even).
+		// Variable measurement holds soft syndrome.
 		// Noise model treated as error probability, and clamped.
 		let epsilon = noise;
 		let epsilon = epsilon.clamp(1e-12, 1.0 - 1e-12);
@@ -111,11 +112,15 @@ impl Decoder {
 		    self.state.p0_aprio[i] = 1.0 - epsilon
 		}
 		for i in 0..self.graph.m {
-		    self.state.soft_syndrome[i] = data[i]
+		    self.state.soft_syndrome[i] = measurement[i]
 		}
 	    }
 	}
+	self.state.hard_syndrome = hard_decision(&self.state.soft_syndrome);
+	Ok(())
+    }
 
+    pub fn decode(&mut self) {
 	let mut i = 0u32;
 	while i < self.iter {
 	    self.vn_update(); // Start with vn_update to get channel info
@@ -126,8 +131,8 @@ impl Decoder {
 	    if i % 5 == 1 {
 		let vn_apost = self.vn_aposteriori();
 		let vn_quant = hard_decision(&vn_apost);
-		let syn_quant = hard_decision(&self.state.soft_syndrome);
-		if self.satisfies_syndrome(&vn_quant, &syn_quant) {
+		if self.satisfies_syndrome(&vn_quant,
+					   &self.state.hard_syndrome) {
 		    let msg = match self.mode {
 			OpMode::Classic => "Valid codeword found",
 			OpMode::Quantum
@@ -139,7 +144,6 @@ impl Decoder {
 		}
 	    }
 	}
-	Ok(())
     }
     
     pub fn vn_update(&mut self) {
@@ -285,12 +289,14 @@ impl DecoderState {
     pub fn new(graph: &DecoderGraph) -> Self {
 	let p0_aprio      = vec![0.0; graph.n];
 	let soft_syndrome = vec![0.0; graph.m];
+	let hard_syndrome = vec![0;   graph.m];
 	let msg_cn_to_vn  = vec![0.5; graph.n_edges]; // 0.5: first half-iter
 	let msg_vn_to_cn  = vec![0.0; graph.n_edges];
 
 	Self {
 	    p0_aprio,
 	    soft_syndrome,
+	    hard_syndrome,
 	    msg_cn_to_vn,
 	    msg_vn_to_cn,
 	}
