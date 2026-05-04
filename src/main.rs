@@ -1,11 +1,13 @@
 mod decoder;
 use decoder::Decoder;
+use decoder::OpMode;
 
 mod random_ldpc;
 use random_ldpc::gen_ldpc;
 
 use rand::rng;
 use rand_distr::{Distribution, StandardNormal};
+
 
 fn main() {
 
@@ -14,9 +16,10 @@ fn main() {
     let dv:usize = 3;
     let dc:usize = 6;
     let h_csr = gen_ldpc(n, dv, dc);
+    let mode = OpMode::Classic;
 
     // Initialize decoder and provide basic info
-    let mut dec = Decoder::new(h_csr, vec![]);
+    let mut dec = Decoder::new(h_csr, mode, vec![]);
     dec.info();
 
     // Create sample received vector (AWGN output)

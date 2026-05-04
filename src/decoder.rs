@@ -8,8 +8,12 @@ mod node_math;
 use node_math::{gallager_prod_exc_one, normalized_mult_exc_one,
 		normalized_mult, hard_decision};
 
+mod op_mode;
+pub use op_mode::OpMode;
+
 pub struct Decoder {
     pub info_pos: Vec<i32>,
+    pub mode:     OpMode,
     pub iter:     u32,
     pub graph:    DecoderGraph,
     pub state:    DecoderState,
@@ -28,9 +32,10 @@ pub struct DecoderGraph {
 }
 
 pub struct DecoderState {
-    pub p0_aprio:     Vec<f32>,
-    pub msg_cn_to_vn: Vec<f32>,
-    pub msg_vn_to_cn: Vec<f32>
+    pub p0_aprio:      Vec<f32>,
+    pub soft_syndrome: Vec<f32>,
+    pub msg_cn_to_vn:  Vec<f32>,
+    pub msg_vn_to_cn:  Vec<f32>
 }
 
 pub struct DecoderScratch {
@@ -43,9 +48,10 @@ pub struct DecoderScratch {
 
 impl Decoder {
     // Constructor
-    pub fn new(h: CsMat<u8>, info_positions: Vec<i32>) -> Self {
+    pub fn new(h: CsMat<u8>, opmode: OpMode, info_positions: Vec<i32>) -> Self {
 
 	let info_pos = info_positions;
+	let mode = opmode;
 	// Set default for iter, the maximum number of iterations
 	let iter = 100;
 
@@ -55,6 +61,7 @@ impl Decoder {
 	
 	Self {
 	    info_pos,
+	    mode,
 	    iter,
 	    graph,
 	    state,
@@ -62,19 +69,51 @@ impl Decoder {
 	}
     }
     
-    pub fn decode(&mut self, recv: &[f32], sigma: f32 ) -> Result<(), String> {
-	if recv.len() != self.graph.n {
+    pub fn decode(&mut self, data: &[f32], noise: f32 ) -> Result<(), String> {
+
+	// Note: we use the variable data to feed measurements to decoder.
+	// Classical LDPC: channel output, data length n
+	// Quantum LDPC:   soft syndrome, P(check even), data length m
+	let expected_data_len;
+	match self.mode {
+	    OpMode::Classic => expected_data_len = self.graph.n,
+	    OpMode::Quantum => expected_data_len = self.graph.m,
+	}
+	if data.len() != expected_data_len {
             return Err(format!(
-		"decode(): recv length {} does not match code length {}",
-		recv.len(), self.graph.n));
+		"decode(): data length {} does not match expected length {}",
+		data.len(), expected_data_len));
 	}
 
-	// Calculate a-priori probabilites based on channel output
-	let alpha = 2.0 / (sigma * sigma);
-
 	self.state.reset_msg();
-	for i in 0..self.graph.n {
-	    self.state.p0_aprio[i] = 1.0 / (1.0 + (alpha * recv[i]).exp())
+
+	match self.mode {
+	    OpMode::Classic => {
+		// Variable data holds channel output. Calculate a-priori prob.
+		// Noise model treated as sigma (AWGN)
+		let sigma = noise;
+		let alpha = 2.0 / (sigma * sigma);
+		for i in 0..self.graph.n {
+		    self.state.p0_aprio[i] = 1.0 /
+			(1.0 + (alpha * data[i]).exp())
+		}
+		for i in 0..self.graph.m {
+		    self.state.soft_syndrome[i] = 1.0 // All checks even
+		}
+	    }
+	    OpMode::Quantum => {
+		// Variable data holds soft syndrome, i.e. P(parity_i even).
+		// Noise model treated as error probability, and clamped.
+		let epsilon = noise;
+		let epsilon = epsilon.clamp(1e-12, 1.0 - 1e-12);
+
+		for i in 0..self.graph.n {
+		    self.state.p0_aprio[i] = 1.0 - epsilon
+		}
+		for i in 0..self.graph.m {
+		    self.state.soft_syndrome[i] = data[i]
+		}
+	    }
 	}
 
 	let mut i = 0u32;
@@ -87,8 +126,15 @@ impl Decoder {
 	    if i % 5 == 1 {
 		let vn_apost = self.vn_aposteriori();
 		let vn_quant = hard_decision(&vn_apost);
-		if self.valid_cw(&vn_quant) == true {
-		    println!("Valid codeword found, {} iterations used.", i);
+		let syn_quant = hard_decision(&self.state.soft_syndrome);
+		if self.satisfies_syndrome(&vn_quant, &syn_quant) {
+		    let msg = match self.mode {
+			OpMode::Classic => "Valid codeword found",
+			OpMode::Quantum
+			    => "Error pattern consistent with \
+				most likely syndrome found",
+		    };
+		    println!("{}, {} iterations used.", msg, i);
 		    break;
 		}
 	    }
@@ -132,7 +178,7 @@ impl Decoder {
 
     pub fn cn_update(&mut self) {
 	let mut incoming = Vec::with_capacity(self.graph.cn_max_deg);
-	for edges in self.graph.cn_edges.iter() {
+	for (j, edges) in self.graph.cn_edges.iter().enumerate() {
 	    incoming.clear();
 	    for &e in edges {
 		incoming.push(self.state.msg_vn_to_cn[e]);
@@ -141,7 +187,9 @@ impl Decoder {
 	    let prefix_f0 = &mut self.scratch.prefix_f0[..deg];
 	    let suffix_f0 = &mut self.scratch.suffix_f0[..deg];
 	    let result    = &mut self.scratch.result[..deg];
-	    gallager_prod_exc_one(&incoming, prefix_f0, suffix_f0, result);
+
+	    let ss = self.state.soft_syndrome[j];
+	    gallager_prod_exc_one(&incoming, ss, prefix_f0, suffix_f0, result);
 
 	    for (&e, &val) in edges.iter().zip(result.iter()) {
 		self.state.msg_cn_to_vn[e] = val;
@@ -166,16 +214,17 @@ impl Decoder {
 	return result;
     }
     
-    pub fn valid_cw(&self, vn_quantized: &[u8]) -> bool {
-	for edges in &self.graph.cn_edges {
+    pub fn satisfies_syndrome(&self, vn_quant: &[u8], syn_quant: &[u8])
+			      -> bool {
+	for (j, edges) in self.graph.cn_edges.iter().enumerate() {
             let mut parity = 0u8;
 
             for e in edges {
 		let vn = self.graph.edge_to_vn[*e];
-		parity ^= vn_quantized[vn];
+		parity ^= vn_quant[vn];
             }
 
-            if parity != 0 {
+            if parity !=  syn_quant[j] {
 		return false;
             }
 	}
@@ -191,14 +240,16 @@ impl Decoder {
 	    syst_enc = false;
 	}
     
-	println!("Decoder properties:\nn: {}, \
-		  k: {}, max iterations: {}, max dc: {}, max dv: {}",
-		 self.graph.n, self.graph.n - self.graph.m, self.iter,
+	println!("\nInformation:\n\
+		  Decoder mode: {}, max iterations: {}\n\
+		  Code properties: n: {}, k: {}, max dc: {}, max dv: {}",
+		 self.mode, self.iter,
+		 self.graph.n, self.graph.n - self.graph.m,
 		 self.graph.cn_max_deg, self.graph.vn_max_deg);
 	if !syst_enc {
-	    println!("Using non-systematic encoding.");
+	    println!("Encoding: Non-systematic.\n");
 	} else {
-	    println!("Using systematic encoding, information positions: {:?}",
+	    println!("Encoding: Systematic, information positions: {:?}\n",
 		     self.info_pos);
 	}
     }
@@ -232,12 +283,14 @@ impl DecoderGraph {
 impl DecoderState {
     // Constructor
     pub fn new(graph: &DecoderGraph) -> Self {
-	let p0_aprio = vec![0.0; graph.n];
-	let msg_cn_to_vn = vec![0.5; graph.n_edges]; // 0.5: first half-iter
-	let msg_vn_to_cn = vec![0.0; graph.n_edges];
+	let p0_aprio      = vec![0.0; graph.n];
+	let soft_syndrome = vec![0.0; graph.m];
+	let msg_cn_to_vn  = vec![0.5; graph.n_edges]; // 0.5: first half-iter
+	let msg_vn_to_cn  = vec![0.0; graph.n_edges];
 
 	Self {
 	    p0_aprio,
+	    soft_syndrome,
 	    msg_cn_to_vn,
 	    msg_vn_to_cn,
 	}
