@@ -81,7 +81,7 @@ impl Decoder {
 	}
     }
 
-    pub fn load(&mut self, measurement: &[f32], noise: f32 )
+    pub fn apply_channel(&mut self, measurement: &[f32], noise: f32 )
 		-> Result<(), String> {
 
 	// Load measurements into the decoder.

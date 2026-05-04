@@ -37,7 +37,7 @@ fn main() {
 	    *re += sigma * noise;
 	}
 
-	match dec.load(&recv, sigma) {
+	match dec.apply_channel(&recv, sigma) {
 	    Ok(_) => (),
 	    Err(e) => println!("error: {}", e),
 	}
