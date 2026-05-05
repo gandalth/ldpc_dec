@@ -28,12 +28,10 @@ fn main() {
     let mut dec = Decoder::new(&graph, mode, vec![]);
     dec.info();
 
-    // Create sample received vector (AWGN output)
-    let sigma = 0.8;
-    let runs = 100;
-
     // tx: all-zeros, encoded, bpsk-mapped: 2 * mod(x*G, 2) - 1
     // sigma: std-dev of AWGN noise
+    let sigma = 0.8;
+    let runs = 100;
     let tx = vec![-1.0; n];
 
     let channel = AwgnChannel { sigma };
