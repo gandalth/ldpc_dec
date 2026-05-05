@@ -6,12 +6,13 @@ use std::cmp::max;
 mod graph;
 use graph::build_graph;
 
-mod node_math;
-use node_math::{gallager_prod_exc_one, normalized_mult_exc_one,
-		normalized_mult, hard_decision};
+use crate::node_math::{gallager_prod_exc_one, normalized_mult_exc_one,
+		       normalized_mult, hard_decision};
 
 mod op_mode;
 pub use op_mode::OpMode;
+
+use crate::channel::Channel;
 
 pub struct Decoder {
     pub info_pos: Vec<i32>,
@@ -81,55 +82,11 @@ impl Decoder {
 	}
     }
 
-    pub fn apply_channel(&mut self, measurement: &[f32], noise: f32 )
-		-> Result<(), String> {
-
-	// Load measurements into the decoder.
-	// Classical LDPC: channel output of length n
-	// Quantum LDPC:   soft syndrome P(parity even) of length m
-	let expected_meas_len = match self.mode {
-	    OpMode::Classic => self.graph.n,
-	    OpMode::Quantum => self.graph.m,
-	};
-	if measurement.len() != expected_meas_len {
-            return Err(format!(
-		"load(): measurement length {} while {} expected",
-		measurement.len(), expected_meas_len));
+    pub fn apply_channel<C: Channel>(&mut self, channel: &C, tx: &[f32])
+				     -> Result<(), String> {
+            self.state.reset_msg();
+            channel.apply(tx, &mut self.state)
 	}
-
-	self.state.reset_msg();
-
-	match self.mode {
-	    OpMode::Classic => {
-		// Variable data holds channel output. Calculate a-priori prob.
-		// Noise model treated as sigma (AWGN)
-		let sigma = noise;
-		let alpha = 2.0 / (sigma * sigma);
-		for i in 0..self.graph.n {
-		    self.state.p0_aprio[i] = 1.0 /
-			(1.0 + (alpha * measurement[i]).exp())
-		}
-		for i in 0..self.graph.m {
-		    self.state.soft_syndrome[i] = 1.0 // All checks even
-		}
-	    }
-	    OpMode::Quantum => {
-		// Variable measurement holds soft syndrome.
-		// Noise model treated as error probability, and clamped.
-		let epsilon = noise;
-		let epsilon = epsilon.clamp(1e-12, 1.0 - 1e-12);
-
-		for i in 0..self.graph.n {
-		    self.state.p0_aprio[i] = 1.0 - epsilon
-		}
-		for i in 0..self.graph.m {
-		    self.state.soft_syndrome[i] = measurement[i]
-		}
-	    }
-	}
-	self.state.hard_syndrome = hard_decision(&self.state.soft_syndrome);
-	Ok(())
-    }
 
     pub fn decode(&mut self) {
 	let mut i = 0u32;

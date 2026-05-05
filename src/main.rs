@@ -1,13 +1,13 @@
 mod decoder;
-use decoder::Decoder;
-use decoder::OpMode;
+use decoder::{Decoder, OpMode};
 
 mod random_ldpc;
 use random_ldpc::gen_ldpc;
 
-use rand::rng;
-use rand_distr::{Distribution, StandardNormal};
+mod channel;
+use channel::{AwgnChannel};
 
+mod node_math;
 
 fn main() {
 
@@ -23,24 +23,22 @@ fn main() {
     dec.info();
 
     // Create sample received vector (AWGN output)
-    let mut rng = rng();
     let sigma = 0.8;
     let runs = 100;
 
-    for _ in 0..runs {
-	// recv: encoded, bpsk-mapped, AWGN-noise : 2 * mod(x*G, 2) - 1 + noise
-	// sigma: std-dev of AWGN noise
-	// For quick check, use all-zeros codeword
-	let mut recv = vec![-1.0; n];
-	for re in &mut recv {
-	    let noise: f32 = StandardNormal.sample(&mut rng);
-	    *re += sigma * noise;
-	}
+    // tx: all-zeros, encoded, bpsk-mapped: 2 * mod(x*G, 2) - 1
+    // sigma: std-dev of AWGN noise
+    let tx = vec![-1.0; n];
 
-	match dec.apply_channel(&recv, sigma) {
+    let channel = AwgnChannel { sigma };
+
+    for _ in 0..runs {
+
+	match dec.apply_channel(&channel, &tx) {
 	    Ok(_) => (),
 	    Err(e) => println!("error: {}", e),
 	}
+
 	dec.decode();
 	println!("{}", dec.result);
     }
