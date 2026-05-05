@@ -1,6 +1,9 @@
 mod decoder;
 use decoder::{Decoder, OpMode};
 
+mod graph;
+use graph::Graph;
+
 mod random_ldpc;
 use random_ldpc::gen_ldpc;
 
@@ -18,8 +21,11 @@ fn main() {
     let h_csr = gen_ldpc(n, dv, dc);
     let mode = OpMode::Classic;
 
+    // Create graph
+    let graph = Graph::new(h_csr);
+
     // Initialize decoder and provide basic info
-    let mut dec = Decoder::new(h_csr, mode, vec![]);
+    let mut dec = Decoder::new(&graph, mode, vec![]);
     dec.info();
 
     // Create sample received vector (AWGN output)

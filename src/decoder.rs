@@ -1,10 +1,6 @@
 use std::fmt;
 
-use sprs::CsMat;
 use std::cmp::max;
-
-mod graph;
-use graph::build_graph;
 
 use crate::node_math::{gallager_prod_exc_one, normalized_mult_exc_one,
 		       normalized_mult, hard_decision};
@@ -13,26 +9,16 @@ mod op_mode;
 pub use op_mode::OpMode;
 
 use crate::channel::Channel;
+use crate::graph::Graph;
 
-pub struct Decoder {
+pub struct Decoder<'a> {
     pub info_pos: Vec<i32>,
     pub mode:     OpMode,
     pub iter:     u32,
-    pub graph:    DecoderGraph,
+    pub graph:    &'a Graph,
     pub state:    DecoderState,
     pub scratch:  DecoderScratch,
     pub result:   DecoderResult,
-}
-
-pub struct DecoderGraph {
-    pub n:          usize,
-    pub m:          usize,
-    pub n_edges:    usize,
-    pub cn_edges:   Vec<Vec<usize>>,
-    pub vn_edges:   Vec<Vec<usize>>,
-    pub cn_max_deg: usize,
-    pub vn_max_deg: usize,
-    pub edge_to_vn: Vec<usize>
 }
 
 pub struct DecoderState {
@@ -57,16 +43,16 @@ pub struct DecoderResult {
     pub success: bool
 }
 
-impl Decoder {
+impl <'a> Decoder <'a> {
     // Constructor
-    pub fn new(h: CsMat<u8>, opmode: OpMode, info_positions: Vec<i32>) -> Self {
+    pub fn new(graph: &'a Graph, opmode: OpMode,
+	       info_positions: Vec<i32>) -> Self {
 
 	let info_pos = info_positions;
 	let mode = opmode;
 	// Set default for iter, the maximum number of iterations
 	let iter = 100;
 
-	let graph   = DecoderGraph::new(h);
 	let state   = DecoderState::new(&graph);
 	let scratch = DecoderScratch::new(&graph);
 	let result  = DecoderResult::new(&graph);
@@ -230,34 +216,9 @@ impl Decoder {
     }
 }
 
-impl DecoderGraph {
-    // Constructor
-    pub fn new(h: CsMat<u8>) -> Self {
-
-	let (m, n)  = h.shape();
-	let n_edges = h.nnz();
-
-	// Build the graph and the edges for decoding
-	let (cn_edges, vn_edges, edge_to_vn) = build_graph(&h);
-	let cn_max_deg = cn_edges.iter().map(|c| c.len()).max().unwrap();
-	let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
-
-	Self {
-	    n,
-	    m,
-	    n_edges,
-	    cn_edges,
-	    vn_edges,
-	    cn_max_deg,
-	    vn_max_deg,
-	    edge_to_vn
-	}
-    }
-}
-
 impl DecoderState {
     // Constructor
-    pub fn new(graph: &DecoderGraph) -> Self {
+    pub fn new(graph: &Graph) -> Self {
 	let p0_aprio      = vec![0.0; graph.n];
 	let soft_syndrome = vec![0.0; graph.m];
 	let hard_syndrome = vec![0;   graph.m];
@@ -284,7 +245,7 @@ impl DecoderState {
 
 impl DecoderScratch {
     // Constructor
-    pub fn new(graph: &DecoderGraph) -> Self {
+    pub fn new(graph: &Graph) -> Self {
 	// Scratch buffers are used by kernel in node_math.rs file.
 	// Resetting and filling is up to these kernels.
 	let max_deg = max(graph.vn_max_deg, graph.cn_max_deg);
@@ -306,7 +267,7 @@ impl DecoderScratch {
 
 impl DecoderResult {
     // Constructor
-    pub fn new(graph: &DecoderGraph) -> Self {
+    pub fn new(graph: &Graph) -> Self {
 	// Result of the decoding process
 	let estimate   = vec![0; graph.n];
 	let iterations = 0;
