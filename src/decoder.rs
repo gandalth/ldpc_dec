@@ -68,7 +68,7 @@ impl <'a> Decoder <'a> {
 	}
     }
 
-    pub fn apply_channel<C: Channel>(&mut self, channel: &C, tx: &[f32])
+    pub fn apply_channel<C: Channel>(&mut self, channel: &C, tx: &[C::Tx])
 				     -> Result<(), String> {
             self.state.reset_msg();
             channel.apply(tx, &mut self.state)

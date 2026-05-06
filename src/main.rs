@@ -8,7 +8,7 @@ mod random_ldpc;
 use random_ldpc::gen_ldpc;
 
 mod channel;
-use channel::{AwgnChannel};
+use channel::{AwgnChannel, QuantumBscChannel};
 
 mod node_math;
 
@@ -32,9 +32,14 @@ fn main() {
     // sigma: std-dev of AWGN noise
     let sigma = 0.8;
     let runs = 100;
-    let tx = vec![-1.0; n];
+    let tx = vec![0u8; n];
 
-    let channel = AwgnChannel { sigma };
+    // let channel = AwgnChannel { sigma };
+    let channel = QuantumBscChannel {
+	graph: &graph,
+	p_error: 0.005,
+	p_syn_flip: 0.001,
+    };
 
     for _ in 0..runs {
 
