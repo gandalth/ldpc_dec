@@ -5,15 +5,11 @@ use std::cmp::max;
 use crate::node_math::{gallager_prod_exc_one, normalized_mult_exc_one,
 		       normalized_mult, hard_decision};
 
-mod op_mode;
-pub use op_mode::OpMode;
-
 use crate::channel::Channel;
 use crate::graph::Graph;
 
 pub struct Decoder<'a> {
     pub info_pos: Vec<i32>,
-    pub mode:     OpMode,
     pub iter:     u32,
     pub graph:    &'a Graph,
     pub state:    DecoderState,
@@ -22,11 +18,10 @@ pub struct Decoder<'a> {
 }
 
 pub struct DecoderState {
-    pub p0_aprio:      Vec<f32>,
-    pub soft_syndrome: Vec<f32>,
-    pub hard_syndrome: Vec<u8>,
-    pub msg_cn_to_vn:  Vec<f32>,
-    pub msg_vn_to_cn:  Vec<f32>
+    pub p0_aprio:     Vec<f32>,
+    pub syndrome:     Vec<u8>,
+    pub msg_cn_to_vn: Vec<f32>,
+    pub msg_vn_to_cn: Vec<f32>
 }
 
 pub struct DecoderScratch {
@@ -45,11 +40,9 @@ pub struct DecoderResult {
 
 impl <'a> Decoder <'a> {
     // Constructor
-    pub fn new(graph: &'a Graph, opmode: OpMode,
-	       info_positions: Vec<i32>) -> Self {
+    pub fn new(graph: &'a Graph, info_positions: Vec<i32>) -> Self {
 
 	let info_pos = info_positions;
-	let mode = opmode;
 	// Set default for iter, the maximum number of iterations
 	let iter = 100;
 
@@ -59,7 +52,6 @@ impl <'a> Decoder <'a> {
 	
 	Self {
 	    info_pos,
-	    mode,
 	    iter,
 	    graph,
 	    state,
@@ -85,8 +77,7 @@ impl <'a> Decoder <'a> {
 	    if i % 5 == 1 {
 		let vn_apost = self.vn_aposteriori();
 		let vn_quant = hard_decision(&vn_apost);
-		if self.satisfies_syndrome(&vn_quant,
-					   &self.state.hard_syndrome) {
+		if self.satisfies_syndrome(&vn_quant, &self.state.syndrome) {
 		    self.result.estimate   = vn_quant;
 		    self.result.iterations = i;
 		    self.result.success    = true;
@@ -139,7 +130,7 @@ impl <'a> Decoder <'a> {
 
     pub fn cn_update(&mut self) {
 	let mut incoming = Vec::with_capacity(self.graph.cn_max_deg);
-	for (j, edges) in self.graph.cn_edges.iter().enumerate() {
+	for edges in self.graph.cn_edges_total.iter() {
 	    incoming.clear();
 	    for &e in edges {
 		incoming.push(self.state.msg_vn_to_cn[e]);
@@ -149,8 +140,7 @@ impl <'a> Decoder <'a> {
 	    let suffix_f0 = &mut self.scratch.suffix_f0[..deg];
 	    let result    = &mut self.scratch.result[..deg];
 
-	    let ss = self.state.soft_syndrome[j];
-	    gallager_prod_exc_one(&incoming, ss, prefix_f0, suffix_f0, result);
+	    gallager_prod_exc_one(&incoming, prefix_f0, suffix_f0, result);
 
 	    for (&e, &val) in edges.iter().zip(result.iter()) {
 		self.state.msg_cn_to_vn[e] = val;
@@ -175,17 +165,15 @@ impl <'a> Decoder <'a> {
 	return result;
     }
     
-    pub fn satisfies_syndrome(&self, vn_quant: &[u8], syn_quant: &[u8])
-			      -> bool {
-	for (j, edges) in self.graph.cn_edges.iter().enumerate() {
+    pub fn satisfies_syndrome(&self, vn_quant: &[u8], syn: &[u8]) -> bool {
+	for (j, edges) in self.graph.cn_edges_total.iter().enumerate() {
             let mut parity = 0u8;
 
             for e in edges {
 		let vn = self.graph.edge_to_vn[*e];
 		parity ^= vn_quant[vn];
             }
-
-            if parity !=  syn_quant[j] {
+            if parity !=  syn[j] {
 		return false;
             }
 	}
@@ -202,10 +190,10 @@ impl <'a> Decoder <'a> {
 	}
     
 	println!("\nInformation:\n\
-		  Decoder mode: {}, max iterations: {}\n\
+		  Decoder with max iterations: {}\n\
 		  Code properties: n: {}, k: {}, max dc: {}, max dv: {}",
-		 self.mode, self.iter,
-		 self.graph.n, self.graph.n - self.graph.m,
+		 self.iter,
+		 self.graph.n_data, self.graph.n_data - self.graph.m,
 		 self.graph.cn_max_deg, self.graph.vn_max_deg);
 	if !syst_enc {
 	    println!("Encoding: Non-systematic.\n");
@@ -219,16 +207,14 @@ impl <'a> Decoder <'a> {
 impl DecoderState {
     // Constructor
     pub fn new(graph: &Graph) -> Self {
-	let p0_aprio      = vec![0.0; graph.n];
-	let soft_syndrome = vec![0.0; graph.m];
-	let hard_syndrome = vec![0;   graph.m];
-	let msg_cn_to_vn  = vec![0.5; graph.n_edges]; // 0.5: first half-iter
-	let msg_vn_to_cn  = vec![0.0; graph.n_edges];
+	let p0_aprio     = vec![0.0; graph.n_total];
+	let syndrome     = vec![0;   graph.m];
+	let msg_cn_to_vn = vec![0.5; graph.n_edges]; // 0.5: first half-iter
+	let msg_vn_to_cn = vec![0.0; graph.n_edges];
 
 	Self {
 	    p0_aprio,
-	    soft_syndrome,
-	    hard_syndrome,
+	    syndrome,
 	    msg_cn_to_vn,
 	    msg_vn_to_cn,
 	}
@@ -269,7 +255,7 @@ impl DecoderResult {
     // Constructor
     pub fn new(graph: &Graph) -> Self {
 	// Result of the decoding process
-	let estimate   = vec![0; graph.n];
+	let estimate   = vec![0; graph.n_total];
 	let iterations = 0;
 	let success    = false;
 

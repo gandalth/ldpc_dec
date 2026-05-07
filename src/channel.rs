@@ -1,7 +1,6 @@
 use rand_distr::{Distribution, StandardNormal};
 
 use crate::decoder::DecoderState;
-use crate::node_math::hard_decision;
 
 use crate::graph::Graph;
 
@@ -38,8 +37,7 @@ impl Channel for AwgnChannel {
         }
 
         // all parity checks are even
-        state.soft_syndrome.fill(1.0);
-	state.hard_syndrome = hard_decision(&state.soft_syndrome);
+        state.syndrome.fill(0);
 	Ok(())
     }
 }
@@ -61,7 +59,7 @@ impl<'a> Channel for QuantumBscChannel<'a> {
 
 	let mut rng = rand::rng();
 
-        let n = self.graph.n;
+        let n = self.graph.n_data;
         let m = self.graph.m;
 
 	if tx.len() != n {
@@ -84,13 +82,13 @@ impl<'a> Channel for QuantumBscChannel<'a> {
 
         let mut syndrome = vec![0u8; m];
 
-        for (j, edges) in self.graph.cn_edges.iter().enumerate() {
+        for (j, edges) in self.graph.cn_edges_data.iter().enumerate() {
             let mut parity = 0u8;
 
             for &e in edges {
                 let v = self.graph.edge_to_vn[e];
                 parity ^= error[v];
-            }
+	    }
 
             syndrome[j] = parity;
         }
@@ -101,22 +99,21 @@ impl<'a> Channel for QuantumBscChannel<'a> {
             }
         }
 
-        for j in 0..m {
-            state.soft_syndrome[j] = if syndrome[j] == 0 {
-                1.0 - self.p_syn_flip
-            } else {
-                self.p_syn_flip
-            };
-        }
-
-	// Set hard_syndrome and variable node priors
-	state.hard_syndrome = hard_decision(&state.soft_syndrome);
-
 	// Set priors for variable nodes
 	for i in 0..n {
 	    state.p0_aprio[i] = 1.0 - self.p_error;
 	}
 
-        Ok(())
+	// Store yndrome errors in additional variable nodes
+	for j in 0..m {
+	    state.p0_aprio[n + j] =
+		if syndrome[j] == 0
+	    {1.0 - self.p_syn_flip} else {self.p_syn_flip};
+	}
+
+	// all parity checks are even
+        state.syndrome.fill(0); // Noisy syndrome in extension of p0_aprio 
+
+	Ok(())
     }
 }

@@ -31,7 +31,7 @@ pub fn normalized_mult_exc_one(f0: &[f32],
     }
 }
 
-pub fn gallager_prod_exc_one(f0: &[f32], p_parity_even: f32,
+pub fn gallager_prod_exc_one(f0: &[f32],
 			     prefix_f0: &mut [f32], suffix_f0: &mut [f32],
 			     result: &mut [f32]) {
     // Calculate Gallager product over input slice leaving out exactly one
@@ -52,13 +52,8 @@ pub fn gallager_prod_exc_one(f0: &[f32], p_parity_even: f32,
         suffix_f0[i]  = suffix_f0[i + 1] * x_next;
     }
 
-    // Contribution by soft syndrome (probability that parity is even)
-    // Mental model: treat it like an additional, constant edge incoming
-    // at the check node. Note: x_1 \xor x_2 ... \xor x_n \xor syn = 0.
-    let delta_parity = 2.0 * p_parity_even - 1.0;
-
     for i in 0..n {
-	result[i] = 0.5 * (delta_parity * prefix_f0[i] * suffix_f0[i]) + 0.5;
+	result[i] = 0.5 * (prefix_f0[i] * suffix_f0[i]) + 0.5;
     }
 }
 
