@@ -8,10 +8,12 @@ use crate::node_math::{gallager_prod_exc_one, normalized_mult_exc_one,
 use crate::channel::Channel;
 use crate::graph::Graph;
 
-pub struct Decoder<'a> {
+use crate::mode::Mode;
+
+pub struct Decoder<'a, M: Mode> {
     pub info_pos: Vec<i32>,
     pub iter:     u32,
-    pub graph:    &'a Graph,
+    pub graph:    &'a Graph<M>,
     pub state:    DecoderState,
     pub scratch:  DecoderScratch,
     pub result:   DecoderResult,
@@ -38,9 +40,9 @@ pub struct DecoderResult {
     pub success: bool
 }
 
-impl <'a> Decoder <'a> {
+impl <'a, M: Mode> Decoder <'a, M> {
     // Constructor
-    pub fn new(graph: &'a Graph, info_positions: Vec<i32>) -> Self {
+    pub fn new(graph: &'a Graph<M>, info_positions: Vec<i32>) -> Self {
 
 	let info_pos = info_positions;
 	// Set default for iter, the maximum number of iterations
@@ -60,7 +62,7 @@ impl <'a> Decoder <'a> {
 	}
     }
 
-    pub fn apply_channel<C: Channel>(&mut self, channel: &C, tx: &[C::Tx])
+    pub fn apply_channel<C: Channel<M>>(&mut self, channel: &C, tx: &[C::Tx])
 				     -> Result<(), String> {
             self.state.reset_msg();
             channel.apply(tx, &mut self.state)
@@ -190,8 +192,9 @@ impl <'a> Decoder <'a> {
 	}
     
 	println!("\nInformation:\n\
-		  Decoder with max iterations: {}\n\
+		  Decoder mode {} with max iterations: {}\n\
 		  Code properties: n: {}, k: {}, max dc: {}, max dv: {}",
+		 M::name(),
 		 self.iter,
 		 self.graph.n_data, self.graph.n_data - self.graph.m,
 		 self.graph.cn_max_deg, self.graph.vn_max_deg);
@@ -206,7 +209,7 @@ impl <'a> Decoder <'a> {
 
 impl DecoderState {
     // Constructor
-    pub fn new(graph: &Graph) -> Self {
+    pub fn new<M: Mode>(graph: &Graph<M>) -> Self {
 	let p0_aprio     = vec![0.0; graph.n_total];
 	let syndrome     = vec![0;   graph.m];
 	let msg_cn_to_vn = vec![0.5; graph.n_edges]; // 0.5: first half-iter
@@ -231,7 +234,7 @@ impl DecoderState {
 
 impl DecoderScratch {
     // Constructor
-    pub fn new(graph: &Graph) -> Self {
+    pub fn new<M: Mode>(graph: &Graph<M>) -> Self {
 	// Scratch buffers are used by kernel in node_math.rs file.
 	// Resetting and filling is up to these kernels.
 	let max_deg = max(graph.vn_max_deg, graph.cn_max_deg);
@@ -253,7 +256,7 @@ impl DecoderScratch {
 
 impl DecoderResult {
     // Constructor
-    pub fn new(graph: &Graph) -> Self {
+    pub fn new<M: Mode>(graph: &Graph<M>) -> Self {
 	// Result of the decoding process
 	let estimate   = vec![0; graph.n_total];
 	let iterations = 0;

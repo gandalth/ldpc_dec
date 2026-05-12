@@ -10,16 +10,13 @@ use random_ldpc::gen_ldpc;
 mod channel;
 use channel::{AwgnChannel, QuantumBscChannel};
 
-mod op_mode;
-use op_mode::OpMode;
+mod mode;
+use mode::{Classic, Quantum};
 
 mod node_math;
 
 fn main() {
 
-    // Set mode: Classic, Quantum
-    let mode = OpMode::Quantum;
-    // let mode = OpMode::Classic;
     
     // Create regular random code, set simulation parameters
     let n:usize  = 2000;
@@ -28,32 +25,42 @@ fn main() {
     let h_csr = gen_ldpc(n, dv, dc);
     let runs = 100;
 
-    // Create graph
-    let graph = Graph::new(h_csr, mode);
-    
-    // ---
-    // Classic LDPC decoder: test with simple AWGN channel
-    // let mode = OpMode::Classic;
-    // sigma: std-dev of AWGN noise
-    // tx: all-zeros, encoded, bpsk-mapped: 2 * mod(x*G, 2) - 1
-    // let tx = vec![-1.0; n];
-    // let channel = AwgnChannel { sigma : 0.8 };
-    // ---
-
     // ---
     // qLDPC joint decoding: test with QuantumBSC channel
     // p_error:    Pauli X-Error (bit flip)
     // p_syn_flip: Syndrome measurement error (syndrome bit flip)
+
+    // Create graph
+    let graph = Graph::<Quantum>::new(h_csr);
+
     let tx = vec![0; n];
     let channel = QuantumBscChannel {
 	graph: &graph,
 	p_error: 0.025,
 	p_syn_flip: 0.005,
     };
+
+    // Initialize decoder
+    let mut dec = Decoder::<Quantum>::new(&graph, vec![]);
     // ---
-    
-    // Initialize decoder and provide basic info
-    let mut dec = Decoder::new(&graph, vec![]);
+
+    //// ---
+    //// Classic LDPC decoder: test with simple AWGN channel
+    //// sigma: std-dev of AWGN noise
+    //
+    //// Create graph
+    //let graph = Graph::<Classic>::new(h_csr);
+    //
+    //// tx: all-zeros, encoded, bpsk-mapped: 2 * mod(x*G, 2) - 1
+    // let tx = vec![-1.0; n];
+    // let channel = AwgnChannel { sigma : 0.8 };
+    //
+    //// Initialize decoder
+    //let mut dec = Decoder::<Classic>::new(&graph, vec![]);
+    //// ---
+
+
+    // Provide info of decoder and code
     dec.info();
     
     for _ in 0..runs {

@@ -1,7 +1,9 @@
 use sprs::CsMat;
-use crate::op_mode::OpMode;
+use crate::mode::{Mode, Classic, Quantum};
 
-pub struct Graph {
+use std::marker::PhantomData;
+
+pub struct Graph<M: Mode> {
     pub n_data:         usize, // Data vn length, classic + quantum: n
     pub n_total:        usize, // Total vn length, classic: n, quantum: n+m
     pub m:              usize,
@@ -11,35 +13,24 @@ pub struct Graph {
     pub vn_edges:       Vec<Vec<usize>>,
     pub cn_max_deg:     usize,
     pub vn_max_deg:     usize,
-    pub edge_to_vn:     Vec<usize>
+    pub edge_to_vn:     Vec<usize>,
+    _mode:              PhantomData<M>
 }
 
 
-impl Graph {
-    pub fn new(h: CsMat<u8>, mode: OpMode) -> Self {
+impl Graph<Classic> {
+    pub fn new(h: CsMat<u8>) -> Self {
         let (m, n_data) = h.shape();
 
-	let n_total = match mode {
-            OpMode::Classic => n_data,
-            OpMode::Quantum => n_data + m,
-        };
+        let n_total = n_data; // Classic decoding, no extra vns
 
 	let cn_edges_data;
 	let cn_edges_total;
         let vn_edges;
         let edge_to_vn;
 
-        match mode {
-            OpMode::Classic => {
-                (cn_edges_data, cn_edges_total, vn_edges, edge_to_vn) =
+        (cn_edges_data, cn_edges_total, vn_edges, edge_to_vn) =
                     build_classical_graph(&h);
-            }
-
-            OpMode::Quantum => {
-                (cn_edges_data, cn_edges_total, vn_edges, edge_to_vn) =
-                    build_quantum_graph(&h);
-            }
-        }
 
         let cn_max_deg = cn_edges_total.iter().map(|c| c.len()).max().unwrap();
         let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
@@ -55,10 +46,43 @@ impl Graph {
             cn_max_deg,
             vn_max_deg,
             edge_to_vn,
+	    _mode: PhantomData,
         }
     }
 }
 
+impl Graph<Quantum> {
+    pub fn new(h: CsMat<u8>) -> Self {
+        let (m, n_data) = h.shape();
+
+        let n_total = n_data + m; // Extra variable nodes for syndrome
+
+	let cn_edges_data;
+	let cn_edges_total;
+        let vn_edges;
+        let edge_to_vn;
+
+        (cn_edges_data, cn_edges_total, vn_edges, edge_to_vn) =
+            build_quantum_graph(&h);
+
+        let cn_max_deg = cn_edges_total.iter().map(|c| c.len()).max().unwrap();
+        let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
+
+        Self {
+            n_data,
+	    n_total,
+            m,
+            n_edges: edge_to_vn.len(),
+            cn_edges_data,
+	    cn_edges_total,
+            vn_edges,
+            cn_max_deg,
+            vn_max_deg,
+            edge_to_vn,
+	    _mode: PhantomData,
+        }
+    }
+}
 
 pub fn build_classical_graph(h_csr: &CsMat<u8>)
 			     -> (Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<usize>) {

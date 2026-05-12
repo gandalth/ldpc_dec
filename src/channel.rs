@@ -1,12 +1,13 @@
 use rand_distr::{Distribution, StandardNormal};
 
 use crate::decoder::DecoderState;
-
 use crate::graph::Graph;
+
+use crate::mode::{Mode, Classic, Quantum};
 
 use rand::Rng;
 
-pub trait Channel {
+pub trait Channel<M: Mode> {
     type Tx;
     fn apply(&self, tx: &[Self::Tx], state: &mut DecoderState)
 	     -> Result<(), String>;
@@ -16,7 +17,7 @@ pub struct AwgnChannel {
     pub sigma: f32,
 }
 
-impl Channel for AwgnChannel {
+impl Channel<Classic> for AwgnChannel {
     type Tx = f32;
     fn apply(&self, tx: &[f32], state: &mut DecoderState)
 	     -> Result<(), String> {
@@ -43,12 +44,12 @@ impl Channel for AwgnChannel {
 }
 
 pub struct QuantumBscChannel<'a> {
-    pub graph: &'a Graph,
+    pub graph: &'a Graph<Quantum>,
     pub p_error: f32,       // physical qubit flip rate
     pub p_syn_flip: f32,    // syndrome measurement noise
 }
 
-impl<'a> Channel for QuantumBscChannel<'a> {
+impl<'a> Channel<Quantum> for QuantumBscChannel<'a> {
     type Tx = u8;
     fn apply(&self, tx: &[u8], state: &mut DecoderState)
 	     -> Result<(), String> {
