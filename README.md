@@ -28,12 +28,10 @@ To illustrate the decoding process, it currently uses a simple AWGN
 channel model for the classical mode and a Quantum-BSC-channel which
 introduces bit flips and syndrome measurement flips.
 
-Decoder:
+Decoder includes:
 
-- OpMode::Classic: Standard belief-propagation decoding for classical
-LDPC codes.
-- OpMode::Quantum: Joint decoding of bit-flip errors and
-syndrome measurement errors.
+- Standard belief-propagation decoding for classical LDPC codes.
+- Joint decoding of bit-flip errors and syndrome measurement errors.
 
 # Future Work
 
