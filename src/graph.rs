@@ -4,17 +4,18 @@ use crate::mode::{Mode, Classic, Quantum};
 use std::marker::PhantomData;
 
 pub struct Graph<M: Mode> {
-    pub n_data:         usize, // Data vn length, classic + quantum: n
-    pub n_total:        usize, // Total vn length, classic: n, quantum: n+m
-    pub m:              usize,
-    pub n_edges:        usize,
-    pub cn_edges_data:  Vec<Vec<usize>>, // Connection to data VNs
-    pub cn_edges_total: Vec<Vec<usize>>, // Connection to data + extended VNs
-    pub vn_edges:       Vec<Vec<usize>>,
-    pub cn_max_deg:     usize,
-    pub vn_max_deg:     usize,
-    pub edge_to_vn:     Vec<usize>,
-    _mode:              PhantomData<M>
+    pub n_data:           usize, // Data vn length, classic + quantum: n
+    pub n_total:          usize, // Total vn length, classic: n, quantum: n+m
+    pub m:                usize,
+    pub n_edges:          usize,
+    pub cn_edges_data:    Vec<Vec<usize>>, // Connection to data VNs
+    pub cn_edges_total:   Vec<Vec<usize>>, // Connection to data + extended VNs
+    pub vn_edges:         Vec<Vec<usize>>,
+    pub cn_max_deg_data:  usize, // Degree of CNs to data VNs
+    pub cn_max_deg_total: usize, // Degree of CNs to data + extended VNs
+    pub vn_max_deg:       usize,
+    pub edge_to_vn:       Vec<usize>,
+    _mode:                PhantomData<M>
 }
 
 
@@ -32,8 +33,11 @@ impl Graph<Classic> {
         (cn_edges_data, cn_edges_total, vn_edges, edge_to_vn) =
                     build_classical_graph(&h);
 
-        let cn_max_deg = cn_edges_total.iter().map(|c| c.len()).max().unwrap();
-        let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
+        let cn_max_deg_total =
+	    cn_edges_total.iter().map(|c| c.len()).max().unwrap();
+	let cn_max_deg_data = cn_max_deg_total; // No graph extension
+
+	let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
 
         Self {
             n_data,
@@ -43,7 +47,8 @@ impl Graph<Classic> {
             cn_edges_data,
 	    cn_edges_total,
             vn_edges,
-            cn_max_deg,
+	    cn_max_deg_data,
+	    cn_max_deg_total,
             vn_max_deg,
             edge_to_vn,
 	    _mode: PhantomData,
@@ -65,7 +70,10 @@ impl Graph<Quantum> {
         (cn_edges_data, cn_edges_total, vn_edges, edge_to_vn) =
             build_quantum_graph(&h);
 
-        let cn_max_deg = cn_edges_total.iter().map(|c| c.len()).max().unwrap();
+	let cn_max_deg_data =
+	    cn_edges_data.iter().map(|c| c.len()).max().unwrap();
+        let cn_max_deg_total =
+	    cn_edges_total.iter().map(|c| c.len()).max().unwrap();
         let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
 
         Self {
@@ -75,9 +83,10 @@ impl Graph<Quantum> {
             n_edges: edge_to_vn.len(),
             cn_edges_data,
 	    cn_edges_total,
-            vn_edges,
-            cn_max_deg,
-            vn_max_deg,
+	    vn_edges,
+	    cn_max_deg_data,
+	    cn_max_deg_total,
+	    vn_max_deg,
             edge_to_vn,
 	    _mode: PhantomData,
         }

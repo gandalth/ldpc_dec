@@ -131,7 +131,7 @@ impl <'a, M: Mode> Decoder <'a, M> {
     }
 
     pub fn cn_update(&mut self) {
-	let mut incoming = Vec::with_capacity(self.graph.cn_max_deg);
+	let mut incoming = Vec::with_capacity(self.graph.cn_max_deg_total);
 	for edges in self.graph.cn_edges_total.iter() {
 	    incoming.clear();
 	    for &e in edges {
@@ -192,12 +192,16 @@ impl <'a, M: Mode> Decoder <'a, M> {
 	}
     
 	println!("\nInformation:\n\
-		  Decoder mode {} with max iterations: {}\n\
-		  Code properties: n: {}, k: {}, max dc: {}, max dv: {}",
+		  Decoder mode {}\n\
+		  Max iterations: {}\n\
+		  Code properties: n: {}, k: {},\n\
+		  max dc (data): {}, max dc (total) {}, \
+		  max dv: {}",
 		 M::name(),
 		 self.iter,
 		 self.graph.n_data, self.graph.n_data - self.graph.m,
-		 self.graph.cn_max_deg, self.graph.vn_max_deg);
+		 self.graph.cn_max_deg_data, self.graph.cn_max_deg_total,
+		 self.graph.vn_max_deg);
 	if !syst_enc {
 	    println!("Encoding: Non-systematic.\n");
 	} else {
@@ -237,7 +241,7 @@ impl DecoderScratch {
     pub fn new<M: Mode>(graph: &Graph<M>) -> Self {
 	// Scratch buffers are used by kernel in node_math.rs file.
 	// Resetting and filling is up to these kernels.
-	let max_deg = max(graph.vn_max_deg, graph.cn_max_deg);
+	let max_deg = max(graph.vn_max_deg, graph.cn_max_deg_total);
 	let prefix_f0 = vec![1.0; max_deg];
 	let prefix_f1 = vec![1.0; max_deg];
 	let suffix_f0 = vec![1.0; max_deg];
