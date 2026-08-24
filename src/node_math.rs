@@ -11,12 +11,12 @@ pub fn normalized_mult_exc_one(f0: &[f32],
     suffix_f1.fill(1.0);
 
     for i in 1..n {
-        prefix_f0[i] = prefix_f0[i - 1] * f0[i - 1];
+	prefix_f0[i] = prefix_f0[i - 1] * f0[i - 1];
 	prefix_f1[i] = prefix_f1[i - 1] * (1.0 - f0[i - 1]);
     }
 
     for i in (0..n - 1).rev() {
-        suffix_f0[i] = suffix_f0[i + 1] * f0[i + 1];
+	suffix_f0[i] = suffix_f0[i + 1] * f0[i + 1];
 	suffix_f1[i] = suffix_f1[i + 1] * (1.0 - f0[i + 1]);
     }
 
@@ -24,9 +24,9 @@ pub fn normalized_mult_exc_one(f0: &[f32],
 	let num = prefix_f0[i] * suffix_f0[i];
 	let den = num + prefix_f1[i] * suffix_f1[i];
 	if den == 0.0 {
-		result[i] = 0.5
-	    } else {
-		result[i] = num / den
+	    result[i] = 0.5
+	} else {
+	    result[i] = num / den
 	}
     }
 }
@@ -49,7 +49,7 @@ pub fn gallager_prod_exc_one(f0: &[f32],
 
     for i in (0..n - 1).rev() {
 	let x_next = 2.0 * f0[i + 1] - 1.0;
-        suffix_f0[i]  = suffix_f0[i + 1] * x_next;
+	suffix_f0[i]  = suffix_f0[i + 1] * x_next;
     }
 
     for i in 0..n {
@@ -74,7 +74,6 @@ pub fn normalized_mult(f0: &[f32]) -> f32 {
     } else {
 	num / den
     }
- 
 }
 
 pub fn hard_decision(p0: &[f32]) -> Vec<u8> {
