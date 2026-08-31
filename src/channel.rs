@@ -105,7 +105,7 @@ impl<'a> Channel<Quantum> for QuantumBscChannel<'a> {
 	    state.p0_aprio[i] = 1.0 - self.p_error;
 	}
 
-	// Store yndrome errors in additional variable nodes
+	// Store syndrome errors in additional variable nodes
 	for j in 0..m {
 	    state.p0_aprio[n + j] =
 		if syndrome[j] == 0

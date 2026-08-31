@@ -70,24 +70,23 @@ impl <'a, M: Mode> Decoder <'a, M> {
 
     pub fn decode(&mut self) {
 	let mut i = 0u32;
-	while i < self.iter {
-	    self.vn_update(); // Start with vn_update to get channel info
-	    self.cn_update();
-	    i += 1;
-	    // First full iteration before checking for valid CW.
-	    // This is a small loss if a valid cw is given to the decoder.
-	    if i % 5 == 1 {
-		let vn_apost = self.vn_aposteriori();
-		let vn_quant = hard_decision(&vn_apost);
-		if self.satisfies_syndrome(&vn_quant, &self.state.syndrome) {
-		    self.result.estimate   = vn_quant;
-		    self.result.iterations = i;
-		    self.result.success    = true;
-		    return;
-		}
+	    while i < self.iter {
+            // Check for early termination by satisfied syndrome
+            let vn_apost = self.vn_aposteriori();
+		    let vn_quant = hard_decision(&vn_apost);
+		    if self.satisfies_syndrome(&vn_quant, &self.state.syndrome) {
+		        self.result.estimate   = vn_quant;
+		        self.result.iterations = i;
+		        self.result.success    = true;
+		        return;
+            }
+            // Perform half iterations and increase iteration counter
+	        self.vn_update(); // Start with vn_update to get channel info
+	        self.cn_update();
+	        i += 1;
 	    }
-	}
-	// --- recompute final estimate ---
+
+	// Final estimate in case of exceeding self.iter
 	let vn_apost = self.vn_aposteriori();
 	let vn_quant = hard_decision(&vn_apost);
 
