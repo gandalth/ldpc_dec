@@ -25,33 +25,33 @@ impl Graph<Classic> {
 
         let n_total = n_data; // Classic decoding, no extra vns
 
-	let cn_edges_data;
-	let cn_edges_total;
+        let cn_edges_data;
+        let cn_edges_total;
         let vn_edges;
         let edge_to_vn;
 
         (cn_edges_data, cn_edges_total, vn_edges, edge_to_vn) =
-                    build_classical_graph(&h);
+            build_classical_graph(&h);
 
         let cn_max_deg_total =
-	    cn_edges_total.iter().map(|c| c.len()).max().unwrap();
-	let cn_max_deg_data = cn_max_deg_total; // No graph extension
+            cn_edges_total.iter().map(|c| c.len()).max().unwrap();
+        let cn_max_deg_data = cn_max_deg_total; // No graph extension
 
-	let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
+        let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
 
         Self {
             n_data,
-	    n_total,
+            n_total,
             m,
             n_edges: edge_to_vn.len(),
             cn_edges_data,
-	    cn_edges_total,
+            cn_edges_total,
             vn_edges,
-	    cn_max_deg_data,
-	    cn_max_deg_total,
+            cn_max_deg_data,
+            cn_max_deg_total,
             vn_max_deg,
             edge_to_vn,
-	    _mode: PhantomData,
+            _mode: PhantomData,
         }
     }
 }
@@ -62,39 +62,39 @@ impl Graph<Quantum> {
 
         let n_total = n_data + m; // Extra variable nodes for syndrome
 
-	let cn_edges_data;
-	let cn_edges_total;
+        let cn_edges_data;
+        let cn_edges_total;
         let vn_edges;
         let edge_to_vn;
 
         (cn_edges_data, cn_edges_total, vn_edges, edge_to_vn) =
             build_quantum_graph(&h);
 
-	let cn_max_deg_data =
-	    cn_edges_data.iter().map(|c| c.len()).max().unwrap();
+        let cn_max_deg_data =
+            cn_edges_data.iter().map(|c| c.len()).max().unwrap();
         let cn_max_deg_total =
-	    cn_edges_total.iter().map(|c| c.len()).max().unwrap();
+            cn_edges_total.iter().map(|c| c.len()).max().unwrap();
         let vn_max_deg = vn_edges.iter().map(|v| v.len()).max().unwrap();
 
         Self {
             n_data,
-	    n_total,
+            n_total,
             m,
             n_edges: edge_to_vn.len(),
             cn_edges_data,
-	    cn_edges_total,
-	    vn_edges,
-	    cn_max_deg_data,
-	    cn_max_deg_total,
-	    vn_max_deg,
+            cn_edges_total,
+            vn_edges,
+            cn_max_deg_data,
+            cn_max_deg_total,
+            vn_max_deg,
             edge_to_vn,
-	    _mode: PhantomData,
+            _mode: PhantomData,
         }
     }
 }
 
 pub fn build_classical_graph(h_csr: &CsMat<u8>)
-			     -> (Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<usize>) {
+                             -> (Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<usize>) {
 
     let rows = h_csr.rows();
     let cols = h_csr.cols();
@@ -102,7 +102,7 @@ pub fn build_classical_graph(h_csr: &CsMat<u8>)
     let mut cn_edges_data = vec![Vec::new(); rows];
     let mut vn_edges = vec![Vec::new(); cols];
     let mut edge_to_vn = Vec::new();
-    
+
     let binding = h_csr.indptr();
     let indptr  = binding.as_slice().unwrap();
     let indices = h_csr.indices();
@@ -116,9 +116,8 @@ pub fn build_classical_graph(h_csr: &CsMat<u8>)
             cn_edges_data[row].push(edge_id);
             vn_edges[col].push(edge_id);
 
-	    edge_to_vn.push(col);
-	    
-            edge_id += 1;
+            edge_to_vn.push(col);
+	        edge_id += 1;
         }
     }
     let cn_edges_total = cn_edges_data.clone(); // No graph extension
@@ -127,7 +126,7 @@ pub fn build_classical_graph(h_csr: &CsMat<u8>)
 }
 
 pub fn build_quantum_graph(h_csr: &CsMat<u8>)
-			   -> (Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<usize>) {
+                           -> (Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<usize>) {
 
     let rows = h_csr.rows();
     let cols = h_csr.cols();
@@ -149,7 +148,7 @@ pub fn build_quantum_graph(h_csr: &CsMat<u8>)
             let col = indices[idx];
 
             cn_edges_data[row].push(edge_id);
-	    cn_edges_total[row].push(edge_id);
+            cn_edges_total[row].push(edge_id);
             vn_edges[col].push(edge_id);
             edge_to_vn.push(col);
 

@@ -10,7 +10,7 @@ use rand::Rng;
 pub trait Channel<M: Mode> {
     type Tx;
     fn apply(&self, tx: &[Self::Tx], state: &mut DecoderState)
-	     -> Result<(), String>;
+             -> Result<(), String>;
 }
 
 pub struct AwgnChannel {
@@ -20,18 +20,18 @@ pub struct AwgnChannel {
 impl Channel<Classic> for AwgnChannel {
     type Tx = f32;
     fn apply(&self, tx: &[f32], state: &mut DecoderState)
-	     -> Result<(), String> {
+             -> Result<(), String> {
 
-	if tx.len() !=  state.p0_aprio.len() {
+        if tx.len() !=  state.p0_aprio.len() {
             return Err(format!(
-		"AWGN apply(): tx / decoder block length mismatch {} <-> {}",
-		tx.len(), state.p0_aprio.len()));
-	}
-	let mut rng = rand::rng();
-	let alpha = 2.0 / (self.sigma * self.sigma);
+                "AWGN apply(): tx / decoder block length mismatch {} <-> {}",
+                tx.len(), state.p0_aprio.len()));
+        }
+        let mut rng = rand::rng();
+        let alpha = 2.0 / (self.sigma * self.sigma);
 
 
-	for (i, &x) in tx.iter().enumerate() {
+        for (i, &x) in tx.iter().enumerate() {
             let noise: f32 = StandardNormal.sample(&mut rng);
             let y = x + self.sigma * noise;
             state.p0_aprio[i] = 1.0 / (1.0 + (alpha * y).exp());
@@ -39,7 +39,7 @@ impl Channel<Classic> for AwgnChannel {
 
         // all parity checks are even
         state.syndrome.fill(0);
-	Ok(())
+        Ok(())
     }
 }
 
@@ -52,18 +52,17 @@ pub struct QuantumBscChannel<'a> {
 impl<'a> Channel<Quantum> for QuantumBscChannel<'a> {
     type Tx = u8;
     fn apply(&self, tx: &[u8], state: &mut DecoderState)
-	     -> Result<(), String> {
+             -> Result<(), String> {
 
+        // The quantum BSC channel flips variables, calculates the correct
+        // syndrome and applies bit-flips to the syndrome as well.
 
-	// The quantum BSC channel flips variables, calculates the correct
-	// syndrome and applies bit-flips to the syndrome as well.
-
-	let mut rng = rand::rng();
+        let mut rng = rand::rng();
 
         let n = self.graph.n_data;
         let m = self.graph.m;
 
-	if tx.len() != n {
+        if tx.len() != n {
             return Err("tx length mismatch".to_string());
         }
 
@@ -89,8 +88,7 @@ impl<'a> Channel<Quantum> for QuantumBscChannel<'a> {
             for &e in edges {
                 let v = self.graph.edge_to_vn[e];
                 parity ^= error[v];
-	    }
-
+            }
             syndrome[j] = parity;
         }
 
@@ -100,21 +98,21 @@ impl<'a> Channel<Quantum> for QuantumBscChannel<'a> {
             }
         }
 
-	// Set priors for variable nodes
-	for i in 0..n {
-	    state.p0_aprio[i] = 1.0 - self.p_error;
-	}
+        // Set priors for variable nodes
+        for i in 0..n {
+            state.p0_aprio[i] = 1.0 - self.p_error;
+        }
 
-	// Store syndrome errors in additional variable nodes
-	for j in 0..m {
-	    state.p0_aprio[n + j] =
-		if syndrome[j] == 0
-	    {1.0 - self.p_syn_flip} else {self.p_syn_flip};
-	}
+        // Store syndrome errors in additional variable nodes
+        for j in 0..m {
+            state.p0_aprio[n + j] =
+                if syndrome[j] == 0
+            {1.0 - self.p_syn_flip} else {self.p_syn_flip};
+        }
 
-	// all parity checks are even
+        // all parity checks are even
         state.syndrome.fill(0); // Noisy syndrome in extension of p0_aprio 
 
-	Ok(())
+        Ok(())
     }
 }
