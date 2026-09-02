@@ -15,6 +15,11 @@ pub fn gen_ldpc(n: usize, dv: usize, dc: usize) -> CsMat<u8> {
     let mut vn_sockets = Vec::with_capacity(edges);
     let mut cn_sockets = Vec::with_capacity(edges);
 
+    // avoid duplicate entries in tri matrix, track through edge_exists
+    // note: resulting degrees can be slightly lower than target, especially
+    // for codes of lower length
+    let mut edge_exists = vec![false; m * n];
+
     for v in 0..n {
         for _ in 0..dv {
             vn_sockets.push(v);
@@ -27,14 +32,20 @@ pub fn gen_ldpc(n: usize, dv: usize, dc: usize) -> CsMat<u8> {
         }
     }
 
-    // random permutation (Gallager style)
+    // random permutation
     let mut rng = rng();
     cn_sockets.shuffle(&mut rng);
 
     for i in 0..edges {
         let v = vn_sockets[i];
         let c = cn_sockets[i];
-        tri.add_triplet(c, v, 1);
+
+        let idx = c * n + v;
+
+        if !edge_exists[idx] {
+            tri.add_triplet(c, v, 1);
+            edge_exists[idx] = true;
+        }
     }
 
     tri.to_csr()
