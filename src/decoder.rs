@@ -192,12 +192,12 @@ impl <'a, M: Mode> Decoder <'a, M> {
         println!("\nInformation:\n\
                   Decoder mode: {}\n\
                   Max iterations: {}\n\
-                  Code properties: n: {}, k: {},\n\
+                  Parity-check matrix properties: n: {}, m: {},\n\
                   max dc (data): {}, max dc (total) {}, \
                   max dv: {}",
                  M::name(),
                  self.iter,
-                 self.graph.n_data, self.graph.n_data - self.graph.m,
+                 self.graph.n_data, self.graph.m,
                  self.graph.cn_max_deg_data, self.graph.cn_max_deg_total,
                  self.graph.vn_max_deg);
         if !syst_enc {
