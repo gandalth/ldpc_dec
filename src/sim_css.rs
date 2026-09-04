@@ -2,6 +2,7 @@ use crate::mode::{Quantum};
 use crate::graph::Graph;
 use crate::channel::{QuantumBscChannel};
 use crate::css::{CssCode, CssGraphs, css_3qubit, css_steane_code};
+use crate::hgp::{hgp_from_random};
 use crate::decoder::Decoder;
 
 pub fn run() {
@@ -12,8 +13,14 @@ pub fn run() {
     // p_z_syn_flip: Syndrome measurement error (on measuring z errors)
 
     let runs = 100;
-    let n:usize  = 7;
-    let (hx, hz) = css_steane_code();
+//    let n:usize  = 7;
+//    let (hx, hz) = css_steane_code();
+
+    // Create a hypergraph product code from a random code as seed
+    let n_seed:usize = 100;
+    let (hx, hz) = hgp_from_random(n_seed, 3, 6);
+    let n:usize = hx.cols();
+    let m:usize = hx.rows();
 
     let css = CssCode::new(hx, hz)
         .expect("CSS validity check failed.");
@@ -25,14 +32,14 @@ pub fn run() {
 
     let x_channel = QuantumBscChannel {
         graph: &graphs.z, // Hz detects X errors
-        p_error: 0.1,
-        p_syn_flip: 0.0,
+        p_error: 0.005,
+        p_syn_flip: 0.0025,
     };
         
     let z_channel = QuantumBscChannel {
         graph: &graphs.x, // Hx detects Z errors
-        p_error: 0.0,
-        p_syn_flip: 0.0,
+        p_error: 0.005,
+        p_syn_flip: 0.0025,
     };
 
     let mut dec_z = Decoder::<Quantum>::new(&graphs.x, vec![]);

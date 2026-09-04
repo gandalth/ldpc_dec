@@ -4,6 +4,8 @@ mod graph;
 mod channel;
 mod random_ldpc;
 mod css;
+mod hgp;
+mod matrix;
 mod decoder;
 
 mod sim_classic;
